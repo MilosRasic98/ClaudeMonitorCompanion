@@ -32,7 +32,7 @@ bool clock_valid();
 void note_prompt();
 
 // Real figures from the statusline. pct is 0..100; resets_at is epoch seconds.
-void note_limits(int pct, time_t resets_at);
+void note_limits(int pct, time_t resets_at, int wpct, time_t wresets_at);
 
 // -1 when the host has never reported. Callers must show something honest
 // rather than inventing a number.
@@ -43,6 +43,12 @@ bool host_data();
 // should refresh at least once a minute, so a large value means it is not
 // running rather than that nothing has changed.
 int32_t host_age_s();
+
+// The seven-day, all-models bucket. Same source, same caveats.
+int weekly_percent();
+time_t weekly_reset_at();
+uint32_t weekly_remaining_s();
+
 
 time_t window_start();      // 0 if no window is open
 time_t window_reset_at();   // host value when known, else derived; 0 if neither

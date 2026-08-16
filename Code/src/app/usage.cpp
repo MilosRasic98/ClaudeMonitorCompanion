@@ -19,6 +19,8 @@ int s_pct = -1;
 time_t s_host_reset = 0;
 uint32_t s_host_seen_ms = 0;
 bool s_host_ever = false;
+int s_wpct = -1;
+time_t s_wreset = 0;
 
 // Anything before this is the epoch the RTC boots to, not a real time.
 const time_t kPlausibleEpoch = 1700000000;  // late 2023
@@ -47,6 +49,8 @@ void begin() {
   s_prompts = s_prefs.getUShort("prompts", 0);
   s_pct = s_prefs.getInt("pct", -1);
   s_host_reset = (time_t)s_prefs.getULong("hreset", 0);
+  s_wpct = s_prefs.getInt("wpct", -1);
+  s_wreset = (time_t)s_prefs.getULong("wreset", 0);
 }
 
 void tick(bool network_up) {
@@ -73,15 +77,33 @@ void note_prompt() {
   persist();
 }
 
-void note_limits(int pct, time_t resets_at) {
-  if (pct < 0 || pct > 100) return;
-  s_pct = pct;
-  s_host_reset = resets_at;
+void note_limits(int pct, time_t resets_at, int wpct, time_t wresets_at) {
   s_host_seen_ms = millis();
   s_host_ever = true;
-  s_prefs.putInt("pct", s_pct);
-  s_prefs.putULong("hreset", (uint32_t)s_host_reset);
+
+  if (pct >= 0 && pct <= 100) {
+    s_pct = pct;
+    s_host_reset = resets_at;
+    s_prefs.putInt("pct", s_pct);
+    s_prefs.putULong("hreset", (uint32_t)s_host_reset);
+  }
+  if (wpct >= 0 && wpct <= 100) {
+    s_wpct = wpct;
+    s_wreset = wresets_at;
+    s_prefs.putInt("wpct", s_wpct);
+    s_prefs.putULong("wreset", (uint32_t)s_wreset);
+  }
 }
+
+int weekly_percent() { return s_wpct; }
+time_t weekly_reset_at() { return s_wreset; }
+
+uint32_t weekly_remaining_s() {
+  if (s_wreset == 0 || !clock_valid()) return 0;
+  const time_t now = time(nullptr);
+  return now >= s_wreset ? 0 : (uint32_t)(s_wreset - now);
+}
+
 
 int percent() { return host_fresh() ? s_pct : -1; }
 

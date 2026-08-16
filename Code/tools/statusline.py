@@ -32,13 +32,20 @@ import subprocess
 import sys
 
 
-def forward(host, token, rl):
+def forward(host, token, five, seven):
     """Spawn a detached POST. Never blocks, never raises into the caller."""
-    pct = rl.get("used_percentage")
-    if pct is None:
+    params = []
+    pct = five.get("used_percentage")
+    if pct is not None:
+        params.append(f"pct={int(round(float(pct)))}")
+        params.append(f"reset={int(five.get('resets_at') or 0)}")
+    wpct = seven.get("used_percentage")
+    if wpct is not None:
+        params.append(f"wpct={int(round(float(wpct)))}")
+        params.append(f"wreset={int(seven.get('resets_at') or 0)}")
+    if not params:
         return
-    resets = int(rl.get("resets_at") or 0)
-    url = f"http://{host}/limits?pct={int(round(float(pct)))}&reset={resets}"
+    url = f"http://{host}/limits?" + "&".join(params)
     try:
         subprocess.Popen(
             ["curl", "-s", "-m", "2", "-X", "POST",
@@ -67,9 +74,11 @@ def main():
     host = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("MASCOT_HOST")
     token = sys.argv[2] if len(sys.argv) > 2 else os.environ.get("MASCOT_TOKEN", "")
 
-    five = (data.get("rate_limits") or {}).get("five_hour") or {}
-    if host and five:
-        forward(host, token, five)
+    limits = data.get("rate_limits") or {}
+    five = limits.get("five_hour") or {}
+    seven = limits.get("seven_day") or {}
+    if host:
+        forward(host, token, five, seven)
 
     model = (data.get("model") or {}).get("display_name", "claude")
     ctx = (data.get("context_window") or {}).get("used_percentage")

@@ -171,6 +171,7 @@ String config_json() {
   j += "\"window_reset\":"; j += (uint32_t)usage::window_reset_at(); j += ",";
   j += "\"prompts\":"; j += usage::prompts(); j += ",";
   j += "\"limit_pct\":"; j += usage::percent(); j += ",";
+  j += "\"weekly_pct\":"; j += usage::weekly_percent(); j += ",";
   j += "\"limit_age_s\":"; j += usage::host_age_s(); j += ",";
   j += "\"limit_from_host\":"; j += usage::host_data() ? "true" : "false"; j += ",";
   j += "\"ap_mode\":"; j += config::ap_mode() ? "true" : "false"; j += ",";
@@ -329,12 +330,16 @@ void install_routes() {
       s_server.send(401, "text/plain", "bad token\n");
       return;
     }
-    if (!s_server.hasArg("pct")) {
-      s_server.send(400, "text/plain", "need pct\n");
+    // Every field is optional except that at least one must be present, so the
+    // sender can report only what it actually has.
+    if (!s_server.hasArg("pct") && !s_server.hasArg("wpct")) {
+      s_server.send(400, "text/plain", "need pct or wpct\n");
       return;
     }
-    usage::note_limits(s_server.arg("pct").toInt(),
-                       (time_t)s_server.arg("reset").toInt());
+    const int pct = s_server.hasArg("pct") ? s_server.arg("pct").toInt() : -1;
+    const int wpct = s_server.hasArg("wpct") ? s_server.arg("wpct").toInt() : -1;
+    usage::note_limits(pct, (time_t)s_server.arg("reset").toInt(), wpct,
+                       (time_t)s_server.arg("wreset").toInt());
     s_server.send(200, "text/plain", "ok\n");
   });
 

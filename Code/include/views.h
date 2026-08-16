@@ -8,9 +8,10 @@
 namespace views {
 
 enum class View : uint8_t {
-  Face,   // the mascot
-  Gauge,  // how far through the usage window, and when it resets
-  Stats,  // plain diagnostics
+  Face,    // the mascot
+  Gauge,   // the five-hour limit, with time to reset
+  Weekly,  // the seven-day, all-models limit
+  Stats,   // plain diagnostics
   Count,
 };
 

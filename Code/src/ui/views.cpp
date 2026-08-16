@@ -38,34 +38,26 @@ void centered(int y, const char *s, int scale) {
   text::draw_centered(y, s, scale, kBlack);
 }
 
-// ------------------------------------------------------------------ gauge --
+// ------------------------------------------------------------------ dials --
 
-// A real circle, not blocks. The earlier version stepped chunky squares around
-// the circumference to stay on the pixel grid, and it was simply hard to read.
-//
-// The trick that makes a smooth ring affordable is separating the two costs.
-// Testing every pixel in the bounding box is nothing — a few thousand float
-// operations. What would have been ruinous is one SPI transaction per pixel. So
-// each row is scanned, runs of identical colour are coalesced, and one rectangle
-// is pushed per run: a few hundred transactions for the whole ring, and only
-// when the value actually changes.
+// Three screens share one renderer: a title, a ring, a big number inside it and
+// an optional line underneath. They differ only in what they measure.
 const int kRingCx = LCD_W / 2;
-const int kRingCy = 120;
+const int kRingCy = 134;
 const int kRingRo = 86;   // outer radius
 const int kRingRi = 66;   // inner radius
 
 int s_last_pct_drawn = -999;
-char s_last_big[8] = "";
-char s_last_sub[16] = "";
+char s_last_big[10] = "";
+char s_last_sub[18] = "";
 
-// The unfilled part of the ring is the background darkened, so the track reads
-// on both the orange field and the red alert field without a hardcoded colour.
+// The unfilled part of the ring is the background lightened toward mid-tone, so
+// the track reads on both the orange field and the red alert field without a
+// hardcoded colour. Too dark and it is indistinguishable from the filled arc,
+// which is the one distinction a dial exists to make.
 uint16_t darken(uint16_t swapped) {
   const uint16_t c = (uint16_t)((swapped >> 8) | (swapped << 8));  // undo the byte swap
   uint16_t r = (c >> 11) & 0x1F, g = (c >> 5) & 0x3F, b = c & 0x1F;
-  // 70%, not 45%. Darker than this and the unfilled track is hard to tell from
-  // the black of the filled arc, which is the one distinction the dial exists
-  // to make.
   r = (uint16_t)(r * 70 / 100);
   g = (uint16_t)(g * 70 / 100);
   b = (uint16_t)(b * 70 / 100);
@@ -94,8 +86,7 @@ void draw_arc(float frac) {
         const int dx = x - kRingCx;
         const int d2 = dx * dx + dy * dy;
         if (d2 <= ro2 && d2 >= ri2) {
-          // Angle measured clockwise from twelve o'clock.
-          float a = atan2f((float)dx, (float)-dy);
+          float a = atan2f((float)dx, (float)-dy);  // clockwise from twelve
           if (a < 0.0f) a += 2.0f * (float)PI;
           c = (a <= sweep) ? kBlack : track;
           on = true;
@@ -115,9 +106,8 @@ void draw_arc(float frac) {
 
 // Only repaint text that actually changed. The percentage moves every few
 // minutes and the countdown once a minute; repainting either at 1 Hz would
-// flicker for no reason.
-// `clear_w` of 0 means erase the full width; anything else erases a centred
-// column of that width, for text that lives inside the ring.
+// flicker for no reason. clear_w of 0 erases the full width, anything else a
+// centred column — text inside the ring must not cut a slot through it.
 void text_slot(char *cache, size_t n, int y, int h, const char *s, int scale,
                int clear_w) {
   if (strncmp(cache, s, n) == 0) return;
@@ -128,52 +118,65 @@ void text_slot(char *cache, size_t n, int y, int h, const char *s, int scale,
   centered(y, s, scale);
 }
 
-void gauge_static() {
+void dial_static(const char *title) {
   display::fill_rect(0, 0, LCD_W, LCD_H, s_bg);
-  centered(6, "5H LIMIT", 3);
+  centered(14, title, 4);
   s_last_pct_drawn = -999;
   s_last_big[0] = '\0';
   s_last_sub[0] = '\0';
 }
 
+// `sub` may be empty, which is how the weekly screen drops the line underneath.
+void dial_dynamic(int pct_for_arc, const char *big, const char *sub) {
+  if (pct_for_arc != s_last_pct_drawn) {
+    s_last_pct_drawn = pct_for_arc;
+    draw_arc(pct_for_arc / 100.0f);
+    s_last_big[0] = '\0';
+  }
+  text_slot(s_last_big, sizeof(s_last_big), kRingCy - 22, 46, big, 8, 112);
+  text_slot(s_last_sub, sizeof(s_last_sub), 236, 22, sub, 4, 0);
+}
+
 void gauge_dynamic() {
-  char big[8], sub[16];
-  int pct_for_arc;
+  char big[10], sub[18];
+  int pct;
 
   if (!usage::clock_valid()) {
     snprintf(big, sizeof(big), "--");
     snprintf(sub, sizeof(sub), "NO CLOCK");
-    pct_for_arc = 0;
+    pct = 0;
   } else if (usage::host_data()) {
-    pct_for_arc = usage::percent();
-    snprintf(big, sizeof(big), "%d%%", pct_for_arc);
+    pct = usage::percent();
+    snprintf(big, sizeof(big), "%d%%", pct);
     const uint32_t r = usage::remaining_s();
-    snprintf(sub, sizeof(sub), "%u:%02u TO RESET", (unsigned)(r / 3600),
+    snprintf(sub, sizeof(sub), "%u:%02u LEFT", (unsigned)(r / 3600),
              (unsigned)((r % 3600) / 60));
   } else if (usage::window_start() != 0) {
     // No statusline reporting. Show elapsed time, and say that is what it is,
     // rather than dressing a clock up as a quota.
-    pct_for_arc = (int)(usage::fraction() * 100.0f);
+    pct = (int)(usage::fraction() * 100.0f);
     const uint32_t r = usage::remaining_s();
     snprintf(big, sizeof(big), "%u:%02u", (unsigned)(r / 3600),
              (unsigned)((r % 3600) / 60));
-    snprintf(sub, sizeof(sub), "EST - NO HOST");
+    snprintf(sub, sizeof(sub), "EST NO HOST");
   } else {
-    pct_for_arc = 0;
+    pct = 0;
     snprintf(big, sizeof(big), "IDLE");
     snprintf(sub, sizeof(sub), "NO DATA YET");
   }
+  dial_dynamic(pct, big, sub);
+}
 
-  if (pct_for_arc != s_last_pct_drawn) {
-    s_last_pct_drawn = pct_for_arc;
-    draw_arc(pct_for_arc / 100.0f);
-    s_last_big[0] = '\0';  // the arc redraw covers the text area
+void weekly_dynamic() {
+  char big[10];
+  const int pct = usage::weekly_percent();
+  if (pct < 0) {
+    snprintf(big, sizeof(big), "--");
+    dial_dynamic(0, big, "");
+    return;
   }
-
-  // 112 wide keeps the erase clear of the ring: the inner radius is 66, and at
-  // the lowest text row the inner chord is still ~122 wide.
-  text_slot(s_last_big, sizeof(s_last_big), kRingCy - 22, 46, big, 8, 112);
-  text_slot(s_last_sub, sizeof(s_last_sub), 218, 18, sub, 3, 0);
+  snprintf(big, sizeof(big), "%d%%", pct);
+  dial_dynamic(pct, big, "");
 }
 
 // ------------------------------------------------------------------ stats --
@@ -236,8 +239,9 @@ View current() { return s_view; }
 
 const char *name() {
   switch (s_view) {
-    case View::Gauge: return "gauge";
-    case View::Stats: return "stats";
+    case View::Gauge:  return "gauge";
+    case View::Weekly: return "weekly";
+    case View::Stats:  return "stats";
     default:          return "face";
   }
 }
@@ -249,6 +253,7 @@ bool render(uint32_t now_ms, uint16_t bg) {
     const int n = (int)View::Count;
     s_view = (View)((((int)s_view + delta) % n + n) % n);
     s_entered = false;
+    Serial.printf("view  : %s\n", name());
   }
 
   if (s_view == View::Face) return false;
@@ -258,15 +263,21 @@ bool render(uint32_t now_ms, uint16_t bg) {
 
   if (!s_entered || bg_changed) {
     s_entered = true;
-    if (s_view == View::Gauge) gauge_static();
-    else stats_static();
+    switch (s_view) {
+      case View::Gauge:  dial_static("5H LIMIT"); break;
+      case View::Weekly: dial_static("WEEKLY"); break;
+      default:           stats_static(); break;
+    }
     s_next_update = 0;
   }
 
   if (now_ms >= s_next_update) {
     s_next_update = now_ms + 1000;
-    if (s_view == View::Gauge) gauge_dynamic();
-    else stats_dynamic();
+    switch (s_view) {
+      case View::Gauge:  gauge_dynamic(); break;
+      case View::Weekly: weekly_dynamic(); break;
+      default:           stats_dynamic(); break;
+    }
   }
   return true;
 }

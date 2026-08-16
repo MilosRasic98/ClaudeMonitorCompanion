@@ -159,6 +159,7 @@ style, as before. If your panel reports its axes the other way round, flip
 |---|---|
 | **Face** | the mascot. The resting screen, and what the shell is built around |
 | **Gauge** | a ring showing how much of the five-hour limit is used, with time to reset below |
+| **Weekly** | the same ring for the seven-day, all-models limit. No countdown — the number is the point |
 | **Stats** | IP, signal, uptime, mood, energy, prompts this window, current time |
 
 ### Where the gauge's numbers come from
@@ -170,7 +171,13 @@ exposes them:
 ```
 rate_limits.five_hour.used_percentage    0-100
 rate_limits.five_hour.resets_at          unix epoch seconds
+rate_limits.seven_day.used_percentage    the all-models weekly limit
+rate_limits.seven_day.resets_at
 ```
+
+There is **no credit or balance figure** anywhere in the status line or the telemetry docs —
+`cost.total_cost_usd` is a client-side estimate of the current session only. So there is no
+credits screen: an invented number on a dial looks exactly as authoritative as a real one.
 
 **No hook carries this.** The only limit-related hook is `StopFailure` with
 `error: rate_limit`, and that fires once you have already hit the wall. So
