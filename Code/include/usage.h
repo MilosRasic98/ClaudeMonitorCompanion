@@ -44,6 +44,14 @@ bool host_data();
 // running rather than that nothing has changed.
 int32_t host_age_s();
 
+// The host can report on a timer while its figures are frozen: a Claude Code
+// session only refreshes its rate-limit snapshot when it makes an API call, so
+// an idle session forwards the same number forever while the work happens
+// somewhere else. The board can spot it, because the hooks keep telling it
+// prompts are being submitted. Many prompts and no change means the percentage
+// is stale, however punctually it arrives.
+bool percent_suspect();
+
 // The seven-day, all-models bucket. Same source, same caveats.
 int weekly_percent();
 time_t weekly_reset_at();

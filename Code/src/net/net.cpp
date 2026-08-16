@@ -190,6 +190,7 @@ String config_json() {
   j += "\"prompts\":"; j += usage::prompts(); j += ",";
   j += "\"limit_pct\":"; j += usage::percent(); j += ",";
   j += "\"weekly_pct\":"; j += usage::weekly_percent(); j += ",";
+  j += "\"limit_suspect\":"; j += usage::percent_suspect() ? "true" : "false"; j += ",";
   j += "\"limit_age_s\":"; j += usage::host_age_s(); j += ",";
   j += "\"limit_from_host\":"; j += usage::host_data() ? "true" : "false"; j += ",";
   j += "\"ap_mode\":"; j += config::ap_mode() ? "true" : "false"; j += ",";

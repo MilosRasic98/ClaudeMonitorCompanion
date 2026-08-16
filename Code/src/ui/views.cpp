@@ -170,8 +170,14 @@ void gauge_dynamic() {
     pct = usage::percent();
     snprintf(big, sizeof(big), "%d%%", pct);
     const uint32_t r = usage::remaining_s();
-    snprintf(sub, sizeof(sub), "%u:%02u LEFT", (unsigned)(r / 3600),
-             (unsigned)((r % 3600) / 60));
+    if (usage::percent_suspect()) {
+      // Punctual but frozen. Say so rather than let the dial look authoritative.
+      snprintf(sub, sizeof(sub), "%u:%02u - PCT STALE", (unsigned)(r / 3600),
+               (unsigned)((r % 3600) / 60));
+    } else {
+      snprintf(sub, sizeof(sub), "%u:%02u LEFT", (unsigned)(r / 3600),
+               (unsigned)((r % 3600) / 60));
+    }
   } else if (usage::window_start() != 0) {
     // No statusline reporting. Show elapsed time, and say that is what it is,
     // rather than dressing a clock up as a quota.

@@ -54,9 +54,13 @@ so you can fix it.
 
 ## Platforms
 
-Everything runs from the Claude Code **CLI** — the desktop app is not involved and cannot be,
-since it has no status bar to run a status line in. Keep a CLI session open alongside the app
-if you use both; an idle one is enough.
+Hooks work everywhere Claude Code runs, including the desktop app: moods, faces, sounds and
+the usage-limit alert all come from them.
+
+The two ring gauges need the **CLI**, and specifically the session you are working in. They
+are fed by the status line, which the desktop app never runs, and whose figures only refresh
+when a session makes API calls — so an idle CLI window parked beside the app reports a frozen
+number rather than a live one. The board notices and labels it.
 
 Hooks are exec form and identical on macOS, Linux and Windows. The status line needs a
 per-platform script, and the generator emits the right one — Python on Unix, PowerShell on

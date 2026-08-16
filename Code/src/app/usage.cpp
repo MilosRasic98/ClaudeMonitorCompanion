@@ -21,6 +21,7 @@ uint32_t s_host_seen_ms = 0;
 bool s_host_ever = false;
 int s_wpct = -1;
 time_t s_wreset = 0;
+uint16_t s_prompts_since_change = 0;
 
 // Anything before this is the epoch the RTC boots to, not a real time.
 const time_t kPlausibleEpoch = 1700000000;  // late 2023
@@ -74,6 +75,7 @@ void note_prompt() {
   } else {
     s_prompts++;
   }
+  if (s_prompts_since_change < 1000) s_prompts_since_change++;
   persist();
 }
 
@@ -82,6 +84,7 @@ void note_limits(int pct, time_t resets_at, int wpct, time_t wresets_at) {
   s_host_ever = true;
 
   if (pct >= 0 && pct <= 100) {
+    if (pct != s_pct) s_prompts_since_change = 0;
     s_pct = pct;
     s_host_reset = resets_at;
     s_prefs.putInt("pct", s_pct);
@@ -106,6 +109,10 @@ uint32_t weekly_remaining_s() {
 
 
 int percent() { return host_fresh() ? s_pct : -1; }
+
+// Five prompts is comfortably more than a percentage point of a five-hour
+// budget, so an unchanged figure across that many is not plausible.
+bool percent_suspect() { return host_fresh() && s_prompts_since_change >= 5; }
 
 int32_t host_age_s() {
   if (!s_host_ever) return -1;

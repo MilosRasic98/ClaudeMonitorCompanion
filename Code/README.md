@@ -232,9 +232,23 @@ path; and the path is **double quoted**, so a space in it does not split the com
 
 **The status line only runs in the CLI.** The desktop app has no status bar, so it never
 invokes the command — confirmed by instrumenting the script and watching a full
-`refreshInterval` pass with zero calls. If you work in the desktop app, keep a CLI session
-open in a terminal alongside it: `refreshInterval` ticks every 60 seconds even when the
-session is idle, which is enough to keep the gauges fed.
+`refreshInterval` pass with zero calls.
+
+**And it must be the session you are actually working in.** A Claude Code session refreshes
+its rate-limit snapshot from API responses, so an *idle* session forwards the same figure
+forever, punctually, while the real work happens elsewhere. Parking an idle CLI window next
+to the desktop app does not work: the gauge looks live, because reports keep arriving on
+time, while the number is frozen. That is worse than showing nothing.
+
+The board detects it. The hooks keep telling it prompts are being submitted, so if five
+prompts arrive with no change in the reported percentage, the gauge labels itself
+`PCT STALE` and `/api/config` reports `limit_suspect: true`. Five prompts is comfortably more
+than a percentage point of a five-hour budget, so an unchanged figure across that many is not
+plausible.
+
+So: **use the CLI as your main interface if you want the gauges live.** If you prefer the
+desktop app, remove the `statusLine` entry — the board then falls back to its own elapsed-time
+estimate and labels it `EST NO HOST`, which is honest about being an estimate.
 
 **`statusLine` is read when a session starts.** Hooks hot-reload when you edit settings, the
 status line does not — after changing it, restart the session or it keeps running the old
