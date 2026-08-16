@@ -106,15 +106,15 @@ void draw_arc(float frac) {
 
 // Only repaint text that actually changed. The percentage moves every few
 // minutes and the countdown once a minute; repainting either at 1 Hz would
-// flicker for no reason. clear_w of 0 erases the full width, anything else a
-// centred column — text inside the ring must not cut a slot through it.
+// flicker for no reason.
+//
 void text_slot(char *cache, size_t n, int y, int h, const char *s, int scale,
-               int clear_w) {
+               bool unused) {
+  (void)unused;
   if (strncmp(cache, s, n) == 0) return;
   strncpy(cache, s, n - 1);
   cache[n - 1] = '\0';
-  if (clear_w > 0) band_centered(y, h, clear_w);
-  else band(y, h);
+  band(y, h);
   centered(y, s, scale);
 }
 
@@ -127,14 +127,35 @@ void dial_static(const char *title) {
 }
 
 // `sub` may be empty, which is how the weekly screen drops the line underneath.
+// The band the big number lives in. Fixed, because the text changes size and an
+// erase that tracked the size would leave the taller version's rows behind.
+const int kBigTop = kRingCy - 22;
+const int kBigH = 44;
+// The inner chord at the lowest row of that band, so an erase can never reach
+// the ring itself.
+const int kBigMaxW = 122;
+
+void draw_big(const char *s) {
+  // Four characters at scale 8 is 120px, which all but touches the ring. Drop a
+  // size rather than let "100%" crowd the circle.
+  const int scale = strlen(s) > 3 ? 6 : 8;
+  const int wide = max(text::width(s_last_big, 8), text::width(s, scale));
+
+  strncpy(s_last_big, s, sizeof(s_last_big) - 1);
+  s_last_big[sizeof(s_last_big) - 1] = '\0';
+
+  band_centered(kBigTop, kBigH, min(wide + 2 * scale, kBigMaxW));
+  text::draw_centered(kRingCy - text::height(scale) / 2, s, scale, kBlack);
+}
+
 void dial_dynamic(int pct_for_arc, const char *big, const char *sub) {
   if (pct_for_arc != s_last_pct_drawn) {
     s_last_pct_drawn = pct_for_arc;
     draw_arc(pct_for_arc / 100.0f);
-    s_last_big[0] = '\0';
+    s_last_big[0] = '\0';   // the arc redraw does not cover the middle
   }
-  text_slot(s_last_big, sizeof(s_last_big), kRingCy - 22, 46, big, 8, 112);
-  text_slot(s_last_sub, sizeof(s_last_sub), 236, 22, sub, 4, 0);
+  if (strcmp(s_last_big, big) != 0) draw_big(big);
+  text_slot(s_last_sub, sizeof(s_last_sub), 236, 22, sub, 4, false);
 }
 
 void gauge_dynamic() {

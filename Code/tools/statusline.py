@@ -65,11 +65,26 @@ def bar(pct, width=10):
 
 
 def main():
+    # Set MASCOT_DEBUG=1 to record every invocation. The only reliable way to
+    # tell "Claude Code is not running this" from "it ran and the POST failed".
+    raw = sys.stdin.read()
     try:
-        data = json.load(sys.stdin)
+        data = json.loads(raw)
     except Exception:
         print("claude")
         return 0
+
+    # MASCOT_DEBUG=1 records each invocation and what arrived on stdin. The only
+    # reliable way to tell "Claude Code never ran this" from "it ran and the
+    # POST failed" -- a distinction that cost real time to chase.
+    if os.environ.get("MASCOT_DEBUG"):
+        try:
+            import time as _t
+            with open(os.path.expanduser("~/.claude/mascot-statusline.log"), "a") as f:
+                f.write(f"{_t.time():.0f} bytes={len(raw)} "
+                        f"rate_limits={json.dumps(data.get('rate_limits'))[:200]}\n")
+        except Exception:
+            pass
 
     host = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("MASCOT_HOST")
     token = sys.argv[2] if len(sys.argv) > 2 else os.environ.get("MASCOT_TOKEN", "")
