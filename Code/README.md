@@ -298,6 +298,30 @@ happens *during* a turn, so answering it returns the face to `WORKING`, not `CHI
 paired `PostToolUse` hook is what clears it. A sticky alert also self-expires after
 `ALERT_MAX_MS` as a safety net, so a missed clear can never strand the face red.
 
+## Drawing your own face
+
+The settings page has a pixel editor. Four slots, 24 x 28 cells each, at ten screen pixels a
+cell — exactly 240 x 280, so what you draw is literally what appears, with no scaling.
+
+Three inks: black, white and erase. White because the built-in sunglasses use it for lens
+glints, and a custom face should be able to do the same.
+
+Each slot has **two frames**, resting and blink. A static face would sit visibly dead next to
+the built-in ones, which all blink, and one extra frame is the cheapest animation there is.
+There is a "copy resting to blink" button because a blink is almost always the resting face
+with the eyes closed. Leave the blink frame empty and the face simply does not blink.
+
+**Only slots with something drawn join the swipe rotation**, so empty ones are never dead
+screens. Clearing a slot drops it back out. Occupancy is judged from the resting frame alone.
+
+Saved to NVS, one key per slot so saving one face does not rewrite the others, and written
+once when you press save rather than on every stroke — flash write cycles are finite. It
+survives reboots and reflashing, since flashing does not erase the NVS partition.
+
+The artwork itself is fixed, so mood shows through the field colour and the backlight rather
+than the drawing: your face still turns red when Claude wants you and dims when it dozes, but
+it cannot sweep its eyes the way the parametric faces do. Blink is the motion it gets.
+
 ## Mood model
 
 Two inputs: events pushed from the host, and time the board tracks itself.

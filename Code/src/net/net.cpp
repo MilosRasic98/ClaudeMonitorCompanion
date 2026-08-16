@@ -173,6 +173,10 @@ String config_json() {
     j += "\""; j += mood::name((mood::Mood)m); j += "\"";
   }
   j += "],";
+  // The editor draws its canvas on the board's real field colour, and needs to
+  // know about a sticky EXCITED alert, which is not inferable from the mood
+  // name alone.
+  j += "\"alerting\":"; j += mood::alerting() ? "true" : "false"; j += ",";
   j += "\"custom_faces\":[";
   for (int i = 0; i < customface::kSlots; i++) {
     if (i) j += ",";
