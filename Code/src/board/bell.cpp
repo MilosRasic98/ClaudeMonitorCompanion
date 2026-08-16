@@ -28,17 +28,23 @@ uint32_t s_release_at = 0;
 
 // Celebration sequence. A zero frequency means silence for that step.
 struct Chirp { uint16_t hz; uint16_t ms; };
-const uint8_t kChirpCount = 3;
+// Two patterns. Built per step rather than stored, so a tone changed on the web
+// page takes effect on the very next buzz with no reboot.
+bool s_long = false;
 
-// Built per step rather than stored, so changing a tone on the web page takes
-// effect on the very next buzz with no reboot.
+uint8_t chirp_count() { return s_long ? 1 : 3; }
+
 Chirp chirp_at(uint8_t i) {
+  if (s_long) return {(uint16_t)PIEZO_LONG_HZ, (uint16_t)config::v::piezo_long_ms()};
   switch (i) {
     case 0:  return {(uint16_t)config::v::piezo_hz1(), PIEZO_BEEP1_MS};
     case 1:  return {0, (uint16_t)config::v::piezo_gap_ms()};
     default: return {(uint16_t)config::v::piezo_hz2(), PIEZO_BEEP2_MS};
   }
 }
+
+// A long buzz repeating would be alarming rather than informative.
+uint8_t repeats() { return s_long ? 1 : (uint8_t)config::v::piezo_repeats(); }
 
 int8_t s_chirp = -1;  // -1 = idle
 uint8_t s_repeat = 0;
@@ -137,11 +143,37 @@ void strike() {
 
 void celebrate() {
 #if BOARD_REV_NEW
-  if (!config::v::piezo_enabled() || config::v::piezo_repeats() < 1) return;
+  if (config::v::piezo_repeats() < 1) return;
+  s_long = false;
   s_chirp = 0;
   s_repeat = 0;
   s_chirp_at = millis();  // first step runs on the next tick
 #endif
+}
+
+void long_buzz() {
+#if BOARD_REV_NEW
+  s_long = true;
+  s_chirp = 0;
+  s_repeat = 0;
+  s_chirp_at = millis();
+#endif
+}
+
+void play(mood::Cue cue) {
+  int choice = 0;
+  switch (cue) {
+    case mood::Cue::Alert: choice = config::v::alert_sound(); break;
+    case mood::Cue::Error: choice = config::v::error_sound(); break;
+    case mood::Cue::Done:  choice = config::v::done_sound(); break;
+    default: return;
+  }
+  // 0 none, 1 bell, 2 buzzer, 3 both.
+  if (choice & 1) strike();
+  if (choice & 2) {
+    if (cue == mood::Cue::Done) celebrate();
+    else long_buzz();
+  }
 }
 
 void tick() {
@@ -159,10 +191,10 @@ void tick() {
 #if BOARD_REV_NEW
   if (s_chirp < 0 || now < s_chirp_at) return;
 
-  if (s_chirp >= kChirpCount) {
+  if (s_chirp >= chirp_count()) {
     piezo_silence();
     s_repeat++;
-    if (s_repeat < config::v::piezo_repeats()) {
+    if (s_repeat < repeats()) {
       // Go round again after a gap wide enough to hear as a separate buzz.
       s_chirp = 0;
       s_chirp_at = now + config::v::piezo_repeat_gap_ms();

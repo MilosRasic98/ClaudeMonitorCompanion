@@ -60,7 +60,11 @@ size_t field_count();
 // Named accessors. Everything reading config goes through these so a rename in
 // the table is a compile error rather than a silent zero.
 namespace v {
-bool piezo_enabled();
+// 0 none, 1 bell, 2 buzzer, 3 both.
+int alert_sound();
+int error_sound();
+int done_sound();
+int piezo_long_ms();
 int piezo_repeats();
 int piezo_hz1();
 int piezo_hz2();
@@ -68,8 +72,6 @@ int piezo_duty();
 int piezo_gap_ms();
 int piezo_repeat_gap_ms();
 
-bool bell_on_alert();
-bool bell_on_error();
 int bell_pin();
 
 int style();

@@ -302,6 +302,7 @@ void handle_post_test() {
   if (s_server.hasArg("what")) {
     const String what = s_server.arg("what");
     if (what == "buzz") bell::celebrate();
+    else if (what == "long") bell::long_buzz();
     else if (what == "strike") bell::strike();
   }
   if (s_server.hasArg("mood")) {

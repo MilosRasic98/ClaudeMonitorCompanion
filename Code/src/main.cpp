@@ -148,8 +148,7 @@ void render_task(void *) {
     }
     if (!handled) face::render(mood::current(), mood::energy(), now);
 
-    if (mood::take_bell()) bell::strike();
-    if (mood::take_celebration()) bell::celebrate();
+    bell::play(mood::take_cue());
 
     busy_us += micros() - t0;
     frames++;
@@ -197,7 +196,7 @@ void print_help() {
   Serial.println("moods  : 1 chill 2 working 3 excited 4 confused 5 angry");
   Serial.println("         6 limit 7 bored 8 sleeping 9 waking | d auto-cycle");
   Serial.println("views  : [ ] style (swipe sideways) | v next screen (swipe up)");
-  Serial.println("tuning : c orange | b bell | z buzz | w scan | r reach | h health | ?");
+  Serial.println("tuning : c orange | b bell | z buzz | l long | w scan | r reach | h ?");
 }
 
 void handle_command(char c) {
@@ -237,7 +236,8 @@ void handle_command(char c) {
     case 'w': net::scan(); return;
     case 'r': net::probe(); return;
     case 'b': bell::strike(); return;
-    case 'z': bell::celebrate(); Serial.println("piezo celebration"); return;
+    case 'z': bell::celebrate(); Serial.println("short buzz"); return;
+    case 'l': bell::long_buzz(); Serial.println("long buzz"); return;
     case 'h':
       Serial.printf("%s/%s energy %u  wifi %s %s  heap %lu\n",
                     mood::name(mood::current()), face::style_name(),

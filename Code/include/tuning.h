@@ -187,6 +187,12 @@ static const uint16_t kRed = COLOR(0xC8, 0x14, 0x10);
 
 // The whole pattern repeats, so it lands as "buzz buzz" rather than a single
 // flourish. Set PIEZO_REPEATS to 1 for one, or raise it if you want more.
+// The long buzz, for things that have gone wrong. Deliberately a different
+// shape from the celebration, not just a different pitch: you should be able to
+// tell good news from bad with your back to the desk.
+#define PIEZO_LONG_HZ 1500
+#define PIEZO_LONG_MS 650
+
 #define PIEZO_REPEATS       2
 #define PIEZO_REPEAT_GAP_MS 130  // longer than the inner gap, so the two read
                                  // as separate buzzes rather than four beeps

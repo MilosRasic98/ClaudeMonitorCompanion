@@ -367,6 +367,16 @@ uint8_t backlight_for(Mood m) {
 void reload_from_config() {
   const int st = config::v::style();
   if (st >= 0 && st < (int)Style::Count) s_style = (Style)st;
+
+  // A custom slot that has since been cleared would render as an empty field:
+  // the custom styles draw no eyes of their own, and there is no drawing to put
+  // in their place. Reachable by selecting a face and then erasing it, so fall
+  // back rather than showing a blank panel.
+  const int cs = custom_slot(s_style);
+  if (cs >= 0 && !customface::has_drawing(cs)) {
+    s_style = Style::Plain;
+    config::set("style", (int32_t)s_style);
+  }
   const int oi = config::v::orange();
   if (oi >= 0 && oi < (int)kOrangeCount) {
     s_orange_idx = (uint8_t)oi;

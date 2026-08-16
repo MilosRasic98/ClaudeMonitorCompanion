@@ -396,13 +396,24 @@ and the IDF components it already ships.
 
 Two separate noises, deliberately.
 
-**The striker rings on anything that wants you.** Every event that turns the field red — a
-permission prompt, a question, being poked past patience — plus errors. Not on finished
-turns; those are not demands.
+Three cues, and you choose independently for each whether it uses the striker, the buzzer,
+both, or nothing:
 
-**The onboard piezo buzzes when a turn finishes** — the "something is done" signal. A rising
-pair, 2.7 kHz then 3.5 kHz, and the whole pattern repeats once so it lands as *buzz buzz*
-rather than a single flourish. Press `z` to hear it on demand.
+| Cue | When |
+|---|---|
+| **Blocked** | anything that turns the field red — a permission prompt, a question, being poked past patience, or hitting the usage limit |
+| **Error** | a tool call or a turn failed |
+| **Finished** | a turn ended normally |
+
+Not everyone wants to build a mechanical bell, so the buzzer alone covers all three.
+
+**The buzzer has two shapes, not two pitches.** Good news is a short rising double chirp,
+2.7 kHz then 3.5 kHz, repeated so it lands as *buzz buzz*. Bad news is one long 650 ms tone.
+Different shapes rather than different notes, so you can tell them apart with your back to
+the desk. A long buzz never repeats — that would be alarming rather than informative.
+
+Press `z` for the short one and `l` for the long one, or use the test buttons on the settings
+page.
 
 `PIEZO_REPEATS` in `tuning.h` sets how many times; `PIEZO_REPEAT_GAP_MS` is deliberately
 wider than the gap inside the pattern, so it reads as two buzzes rather than four beeps.

@@ -58,12 +58,10 @@ uint32_t in_mood_ms();       // since the current mood was entered
 // unacknowledged "needs input", or a fit of pique. Drives the red field.
 bool alerting();
 
-// True exactly once per alert that warrants an audible strike: anything that
-// turns the field red (a block, or being poked past patience) plus errors.
-bool take_bell();
-
-// True exactly once when a turn finishes. Distinct from take_bell() because it
-// is a celebration, not a demand — it gets the onboard piezo, not the striker.
-bool take_celebration();
+// What, if anything, should make a noise. Returned once and then cleared. The
+// three are kept apart because they mean different things and the user chooses
+// a different sound for each: a demand, a failure, and a celebration.
+enum class Cue : uint8_t { None, Alert, Error, Done };
+Cue take_cue();
 
 }  // namespace mood

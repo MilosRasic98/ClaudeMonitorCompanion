@@ -14,16 +14,17 @@ namespace {
 // factory-reset behaviour can never drift apart.
 const Field kFields[] = {
     // group      key                   label                    type         min   max     default                hint
-    {"Sound",  "piezo_enabled",      "Piezo buzzer",           Type::Bool,    0,     1, 1,                      "Chirps when a turn finishes", nullptr, nullptr},
     {"Sound",  "piezo_repeats",      "Buzz repeats",           Type::Int,     0,     5, PIEZO_REPEATS,          "2 gives the buzz-buzz", nullptr, nullptr},
     {"Sound",  "piezo_hz1",          "First tone (Hz)",        Type::Int,   500,  6000, PIEZO_BEEP1_HZ,         nullptr, nullptr, nullptr},
     {"Sound",  "piezo_hz2",          "Second tone (Hz)",       Type::Int,   500,  6000, PIEZO_BEEP2_HZ,         "Same as the first for a flat buzz", nullptr, nullptr},
     {"Sound",  "piezo_duty",         "Volume",                 Type::Int,     0,   255, PIEZO_DUTY,             "Loudest near 128", nullptr, nullptr},
     {"Sound",  "piezo_gap_ms",       "Gap inside a buzz (ms)", Type::Int,     0,   500, PIEZO_GAP_MS,           nullptr, nullptr, nullptr},
     {"Sound",  "piezo_rep_gap_ms",   "Gap between buzzes (ms)",Type::Int,     0,  1000, PIEZO_REPEAT_GAP_MS,    "Wider than the inner gap, or it reads as four beeps", nullptr, nullptr},
+    {"Sound",  "alert_sound",        "Sound when blocked",     Type::Enum,    0,     3, 3,                      "Needs input, angry, or the usage limit", "none,bell,buzzer,both", nullptr},
+    {"Sound",  "error_sound",        "Sound on errors",        Type::Enum,    0,     3, 2,                      nullptr, "none,bell,buzzer,both", nullptr},
+    {"Sound",  "done_sound",         "Sound when finished",    Type::Enum,    0,     3, 2,                      "The short double buzz", "none,bell,buzzer,both", nullptr},
+    {"Sound",  "piezo_long_ms",      "Long buzz length (ms)",  Type::Int,   100,  3000, PIEZO_LONG_MS,          "The buzzer's bad-news sound", nullptr, nullptr},
     {"Sound",  "bell_pin",           "Bell striker GPIO",      Type::Int,    -1,    48, -1,                     "-1 disables. Free pins: 17, 18, 21, 38, 47, 48", nullptr, nullptr},
-    {"Sound",  "bell_on_alert",      "Ring on alerts",         Type::Bool,    0,     1, 1,                      "Anything that turns the screen red", nullptr, nullptr},
-    {"Sound",  "bell_on_error",      "Ring on errors",         Type::Bool,    0,     1, 1,                      nullptr, nullptr, nullptr},
 
     {"Face",   "style",              "Face style",             Type::Enum,    0,     8, 0,                      "Also changed by swiping the screen", "plain,grin,round,pixel,shades,custom1,custom2,custom3,custom4", nullptr},
     {"Face",   "orange",             "Background shade",       Type::Enum,    0,     3, ORANGE_DEFAULT,         "Match it to your printed shell by eye", "saturated,bright,deep,amber", nullptr},
@@ -82,8 +83,34 @@ void nvs_key(size_t i, char *out, size_t n) { snprintf(out, n, "f%u", (unsigned)
 
 }  // namespace
 
+// Values are keyed by table index, so inserting or removing a field shifts
+// every later one and each would silently inherit its neighbour's stored value
+// — in range, plausible, and wrong. Fingerprint the table and start clean when
+// it changes. Losing settings on a firmware update is annoying; silently
+// applying the wrong ones is worse.
+uint32_t schema_fingerprint() {
+  uint32_t h = 2166136261u;  // FNV-1a
+  for (size_t i = 0; i < kCount; i++) {
+    for (const char *p = kFields[i].key; *p; p++) {
+      h = (h ^ (uint8_t)*p) * 16777619u;
+    }
+    h = (h ^ (uint8_t)kFields[i].type) * 16777619u;
+  }
+  return h;
+}
+
 void begin() {
   s_prefs.begin("mascotcfg", false);
+
+  const uint32_t fp = schema_fingerprint();
+  const bool schema_changed = s_prefs.getULong("schema", 0) != fp;
+
+
+  if (schema_changed) {
+    log_w("config: settings table changed, restoring defaults");
+    reset_defaults();
+    s_prefs.putULong("schema", fp);
+  }
 
   // The JSON emitter groups by consecutive runs, so a group appearing twice in
   // the table would silently render as two sections with the same name.
@@ -99,7 +126,8 @@ void begin() {
   char k[8];
   for (size_t i = 0; i < kCount; i++) {
     nvs_key(i, k, sizeof(k));
-    const int32_t stored = s_prefs.getInt(k, kFields[i].def);
+    const int32_t stored =
+        schema_changed ? kFields[i].def : s_prefs.getInt(k, kFields[i].def);
     // A stored value outside the current range means the table changed under
     // it; fall back rather than honouring something nonsensical.
     s_values[i] = (stored < kFields[i].min || stored > kFields[i].max)
@@ -109,7 +137,8 @@ void begin() {
     if (kFields[i].sdef) {
       char sk[10];
       snprintf(sk, sizeof(sk), "s%u", (unsigned)i);
-      String stored_s = s_prefs.getString(sk, kFields[i].sdef);
+      String stored_s = schema_changed ? String(kFields[i].sdef)
+                                       : s_prefs.getString(sk, kFields[i].sdef);
       strncpy(s_strings[i].v, stored_s.c_str(), sizeof(s_strings[i].v) - 1);
       s_strings[i].v[sizeof(s_strings[i].v) - 1] = '\0';
     }
@@ -179,7 +208,10 @@ const Field *fields() { return kFields; }
 size_t field_count() { return kCount; }
 
 namespace v {
-bool piezo_enabled()       { return get("piezo_enabled") != 0; }
+int alert_sound()          { return get("alert_sound"); }
+int error_sound()          { return get("error_sound"); }
+int done_sound()           { return get("done_sound"); }
+int piezo_long_ms()        { return get("piezo_long_ms"); }
 int piezo_repeats()        { return get("piezo_repeats"); }
 int piezo_hz1()            { return get("piezo_hz1"); }
 int piezo_hz2()            { return get("piezo_hz2"); }
@@ -187,8 +219,6 @@ int piezo_duty()           { return get("piezo_duty"); }
 int piezo_gap_ms()         { return get("piezo_gap_ms"); }
 int piezo_repeat_gap_ms()  { return get("piezo_rep_gap_ms"); }
 
-bool bell_on_alert()       { return get("bell_on_alert") != 0; }
-bool bell_on_error()       { return get("bell_on_error") != 0; }
 int bell_pin()             { return get("bell_pin"); }
 
 int style()                { return get("style"); }

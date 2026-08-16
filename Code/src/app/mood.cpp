@@ -24,8 +24,7 @@ bool s_turn_running = false;
 // Excited and Confused come in two flavours: a timed celebration that decays on
 // its own, and a sticky alert that waits to be acknowledged.
 bool s_sticky = false;
-bool s_bell_pending = false;
-bool s_celebration_pending = false;
+Cue s_cue = Cue::None;
 
 int32_t s_energy = 0;
 uint32_t s_energy_last_decay = 0;
@@ -68,7 +67,7 @@ void apply(Event e, uint32_t now) {
       s_turn_running = false;
       // A finished turn is a celebration, not an alert: it times out by itself.
       enter(Mood::Excited, now, /*sticky=*/false);
-      s_celebration_pending = true;
+      s_cue = Cue::Done;
       break;
 
     case Event::NeedsInput:
@@ -77,7 +76,7 @@ void apply(Event e, uint32_t now) {
       // question happens *during* a turn — Claude is paused, not finished — so
       // answering it should drop back into WORKING, not CHILL.
       enter(Mood::Excited, now, /*sticky=*/true);
-      if (config::v::bell_on_alert()) s_bell_pending = true;
+      s_cue = Cue::Alert;
       break;
 
     case Event::LimitReached:
@@ -85,13 +84,13 @@ void apply(Event e, uint32_t now) {
       // fixes it, so it clears only on a tap or when work resumes.
       s_turn_running = false;
       enter(Mood::Limit, now, /*sticky=*/true);
-      if (config::v::bell_on_alert()) s_bell_pending = true;
+      s_cue = Cue::Alert;
       break;
 
     case Event::Answered:
       bump_energy(ENERGY_BUMP_EVENT / 2);
       s_sticky = false;
-      s_bell_pending = false;
+      s_cue = Cue::None;
       enter(s_turn_running ? Mood::Working : Mood::Chill, now);
       break;
 
@@ -99,7 +98,7 @@ void apply(Event e, uint32_t now) {
       bump_energy(ENERGY_BUMP_EVENT);
       s_turn_running = false;
       enter(Mood::Confused, now, /*sticky=*/false);
-      if (config::v::bell_on_error()) s_bell_pending = true;
+      s_cue = Cue::Error;
       break;
 
     case Event::Idle:
@@ -120,7 +119,7 @@ void apply(Event e, uint32_t now) {
       // Clears any alert and counts as a small sign of life, but deliberately
       // does not reset the boredom clock — petting the mascot is not a prompt.
       s_sticky = false;
-      s_bell_pending = false;
+      s_cue = Cue::None;
       bump_energy(ENERGY_BUMP_EVENT / 2);
 
       const uint8_t need =
@@ -134,7 +133,7 @@ void apply(Event e, uint32_t now) {
           now - oldest <= (uint32_t)config::v::poke_window_s() * 1000UL) {
         for (uint32_t &t : s_pokes) t = 0;  // don't re-trigger on the next tap
         enter(Mood::Angry, now);
-        if (config::v::bell_on_alert()) s_bell_pending = true;
+        s_cue = Cue::Alert;
         break;
       }
 
@@ -254,16 +253,10 @@ Mood current() { return s_mood; }
 uint8_t energy() { return (uint8_t)s_energy; }
 uint32_t in_mood_ms() { return millis() - s_mood_entered; }
 
-bool take_bell() {
-  if (!s_bell_pending) return false;
-  s_bell_pending = false;
-  return true;
-}
-
-bool take_celebration() {
-  if (!s_celebration_pending) return false;
-  s_celebration_pending = false;
-  return true;
+Cue take_cue() {
+  const Cue c = s_cue;
+  s_cue = Cue::None;
+  return c;
 }
 
 const char *name(Mood m) {
