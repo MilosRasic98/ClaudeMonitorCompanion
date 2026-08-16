@@ -7,10 +7,20 @@
 // 24 x 28 cells at 10 screen pixels each is exactly 240 x 280, so the grid maps
 // one-to-one onto the panel with no scaling and no rounding.
 //
-// Two frames per face: resting and blink. A static custom face would sit dead
-// next to the built-in ones, which all blink — and a blink is the cheapest
-// possible animation, one extra frame. If the blink frame is empty the board
+// Two frames per face: resting and blink. If the blink frame is empty the board
 // simply does not blink.
+//
+// Everything else the built-in faces do — the working sweep, the bored droop,
+// the excited bounce, the poke shake — comes from *translating* the drawing
+// within the panel and letting the background fill what the shift vacates. The
+// parametric faces animate by changing shape; a bitmap cannot, but it can move,
+// and moving turns out to carry most of the expression. So a drawn face gets
+// the same mood vocabulary as a built-in one without the user drawing a single
+// extra frame.
+//
+// Offsets are whole cells. The art is ten-pixel blocks, so moving in ten-pixel
+// steps is what keeps it looking like the same object rather than a bitmap
+// sliding around underneath a grid.
 //
 // Four slots, so a few faces can be drawn and swiped between. Only slots that
 // actually hold a drawing join the rotation; empty ones would be dead screens.
@@ -39,8 +49,14 @@ bool has_blink(int slot);    // frame 1 does too, so blinking is worth doing
 bool any_drawing();
 int used_count();
 
-// Paint a frame. `full` forces every cell; otherwise only cells that differ
-// from the other frame are drawn, which is what makes a blink cheap.
-void draw(int slot, int frame, uint16_t bg, bool full);
+// Paint a frame, translated by whole cells. Only cells that differ from what is
+// currently on screen are drawn, so a blink or a one-cell drift costs a handful
+// of rectangles rather than 672.
+void draw(int slot, int frame, uint16_t bg, int dx_cells, int dy_cells);
+
+// Forget what is on screen. Call after anything else has painted over the face
+// — a full repaint, a style change — so the next draw() does not skip cells it
+// believes are already correct.
+void invalidate();
 
 }  // namespace customface

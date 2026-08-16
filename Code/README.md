@@ -371,9 +371,19 @@ Saved to NVS, one key per slot so saving one face does not rewrite the others, a
 once when you press save rather than on every stroke — flash write cycles are finite. It
 survives reboots and reflashing, since flashing does not erase the NVS partition.
 
-The artwork itself is fixed, so mood shows through the field colour and the backlight rather
-than the drawing: your face still turns red when Claude wants you and dims when it dozes, but
-it cannot sweep its eyes the way the parametric faces do. Blink is the motion it gets.
+**A drawn face animates too.** It cannot change shape the way the parametric eyes do, but it
+can move, and moving carries most of the expression. The whole drawing translates within the
+panel and the background fills whatever the shift vacates — so it sweeps while Claude works,
+droops and looks aside when bored, bounces when excited, shakes off a poke, and breathes
+slowly while asleep. Exactly the same mood vocabulary as the built-in faces, with no extra
+frames to draw.
+
+Motion is in whole cells. The art is ten-pixel blocks, so a ten-pixel step is what keeps it
+reading as the same object moving, rather than a bitmap sliding underneath a grid. Amplitudes
+are `CUSTOM_*_CELLS` in [tuning.h](include/tuning.h).
+
+Only cells that differ from what is already on screen get redrawn, so a one-cell drift or a
+blink is a handful of rectangles rather than 672.
 
 ## Mood model
 

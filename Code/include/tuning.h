@@ -152,6 +152,13 @@ static const uint16_t kRed = COLOR(0xC8, 0x14, 0x10);
 #define POKE_WINDOW_MS    4000
 #define ANGRY_MS          7000  // how long it stays cross
 
+// How far a drawn face travels, in whole cells. The art is ten-pixel blocks, so
+// one cell is a ten-pixel step — small numbers go a long way.
+#define CUSTOM_DRIFT_CELLS  1  // idle wander
+#define CUSTOM_SWEEP_CELLS  2  // scanning while Claude works
+#define CUSTOM_BOUNCE_CELLS 2  // excited
+#define CUSTOM_SHAKE_CELLS  1  // confused, and shaking off a poke
+
 // The usage-limit face: a big exclamation mark across the red field. Blinks,
 // because a static red screen reads as a crash rather than a message.
 #define BANG_BAR_W    30

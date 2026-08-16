@@ -81,6 +81,7 @@ bool s_limit_on = false;
 bool s_custom_drawn = false;
 int s_custom_frame = 0;
 int s_custom_slot = -1;
+int s_custom_dx = 0, s_custom_dy = 0;
 
 // Blink is an overlay on whatever the mood is doing, not a mood of its own.
 uint32_t s_blink_at = 0;
@@ -192,6 +193,48 @@ void draw_eye(int eye, const EyeState &next) {
 
   s_prev[eye] = next;
   s_prev_box[eye] = box;
+}
+
+// Where a drawn face sits this frame, in whole cells. The same motions the
+// parametric faces perform with geometry, done by moving the whole bitmap:
+// nothing here changes the artwork, only where it is.
+void custom_offset(Mood m, uint8_t energy, uint32_t now, uint32_t in_mood,
+                   int &cx, int &cy) {
+  cx = 0;
+  cy = 0;
+  switch (m) {
+    case Mood::Sleeping:
+      cy = (int)lroundf(wave(now, SLEEP_BREATH_MS) * 1.0f);
+      break;
+    case Mood::Chill:
+      cx = (int)lroundf(wave(now, 5200) * CUSTOM_DRIFT_CELLS);
+      break;
+    case Mood::Bored:
+      cx = -CUSTOM_DRIFT_CELLS;
+      cy = CUSTOM_DRIFT_CELLS;
+      break;
+    case Mood::Working: {
+      const float speed = 1.0f + (energy / 100.0f);
+      cx = (int)lroundf(wave((uint32_t)(now * speed), WORKING_SWEEP_MS) *
+                        CUSTOM_SWEEP_CELLS);
+      break;
+    }
+    case Mood::Excited:
+      cy = -(int)lroundf(fabsf(wave(now, EXCITED_BOUNCE_MS)) *
+                         CUSTOM_BOUNCE_CELLS);
+      break;
+    case Mood::Confused:
+      cx = (int)lroundf(wave(now, CONFUSED_SHAKE_MS) * CUSTOM_SHAKE_CELLS);
+      break;
+    default:
+      break;
+  }
+  (void)in_mood;
+
+  // A poke is shaken off whatever the mood, same as the parametric faces.
+  if (now < s_poke_until) {
+    cx += (int)lroundf(wave(now, POKE_SHAKE_PER_MS) * CUSTOM_SHAKE_CELLS);
+  }
 }
 
 // The usage-limit face. Not eyes at all — a single exclamation mark centred on
@@ -389,6 +432,7 @@ void reload_from_config() {
 void repaint() {
   display::fill_rect(0, 0, LCD_W, LCD_H, s_bg);
   s_custom_drawn = false;
+  customface::invalidate();
   if (style_info(s_style).has_accessories) {
     draw_accessories(s_style, s_acc_dx, s_acc_dy, s_bg);
     s_acc_drawn = true;
@@ -463,9 +507,9 @@ void render(Mood m, uint8_t energy, uint32_t now) {
   const StyleInfo &info = style_info(s_style);
 
     // The custom face owns the whole panel: the user drew every cell, so there
-  // is nothing for the eye or accessory code to add. It still blinks, if a
-  // blink frame was drawn, and it still turns red when the mascot wants
-  // something — mood shows through the field, not the artwork.
+  // is nothing for the eye or accessory code to add. It cannot change shape the
+  // way the parametric faces do, but it can move, and moving carries most of
+  // the expression — so it gets the same mood vocabulary by translation.
   const int slot = custom_slot(s_style);
   if (m != Mood::Limit && slot >= 0 && customface::has_drawing(slot)) {
     const float stretch = blink_stretch(m);
@@ -474,13 +518,21 @@ void render(Mood m, uint8_t energy, uint32_t now) {
         blink_openness(now, energy, stretch) < 0.5f;
     const int frame = closed ? 1 : 0;
 
-    if (!s_custom_drawn || frame != s_custom_frame || slot != s_custom_slot) {
-      const bool first = !s_custom_drawn || slot != s_custom_slot;
-      if (first) display::fill_rect(0, 0, LCD_W, LCD_H, s_bg);
-      customface::draw(slot, frame, s_bg, first);
+    int cx = 0, cy = 0;
+    custom_offset(m, energy, now, in_mood, cx, cy);
+
+    if (!s_custom_drawn || frame != s_custom_frame || slot != s_custom_slot ||
+        cx != s_custom_dx || cy != s_custom_dy) {
+      if (!s_custom_drawn || slot != s_custom_slot) {
+        display::fill_rect(0, 0, LCD_W, LCD_H, s_bg);
+        customface::invalidate();
+      }
+      customface::draw(slot, frame, s_bg, cx, cy);
       s_custom_drawn = true;
       s_custom_frame = frame;
       s_custom_slot = slot;
+      s_custom_dx = cx;
+      s_custom_dy = cy;
       s_first_frame = true;   // eyes repaint wholesale if the style changes back
       s_acc_drawn = false;
     }
@@ -493,6 +545,7 @@ void render(Mood m, uint8_t energy, uint32_t now) {
   }
   if (s_custom_drawn) {
     s_custom_drawn = false;
+    customface::invalidate();
     display::fill_rect(0, 0, LCD_W, LCD_H, s_bg);
     s_first_frame = true;
     s_acc_drawn = false;

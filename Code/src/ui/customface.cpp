@@ -16,6 +16,12 @@ uint8_t s_data[kSlots][kSlotBytes];
 
 bool valid(int slot) { return slot >= 0 && slot < kSlots; }
 
+// What is currently on the panel, one ink value per cell. Diffing against this
+// rather than against the other frame means the same cheap path serves a blink,
+// a drift, a bounce and a slot change alike.
+uint8_t s_shown[kCells];
+bool s_shown_valid = false;
+
 // Four cells per byte, most significant bits first.
 inline uint8_t cell_at(int slot, int frame, int i) {
   const int idx = frame * kFrameBytes + (i >> 2);
@@ -80,9 +86,10 @@ int used_count() {
   return n;
 }
 
-void draw(int slot, int frame, uint16_t bg, bool full) {
+void invalidate() { s_shown_valid = false; }
+
+void draw(int slot, int frame, uint16_t bg, int dx, int dy) {
   if (!valid(slot)) return;
-  const int other = frame ^ 1;
 
   for (int row = 0; row < kH; row++) {
     int run_start = -1;
@@ -94,14 +101,19 @@ void draw(int slot, int frame, uint16_t bg, bool full) {
       uint16_t c = 0;
 
       if (col < kW) {
+        // Sample the drawing shifted by (dx, dy). Anything the shift moves in
+        // from outside is background, which is what makes the face look like it
+        // moved rather than wrapped.
+        const int sx = col - dx, sy = row - dy;
+        const uint8_t v = (sx >= 0 && sx < kW && sy >= 0 && sy < kH)
+                              ? cell_at(slot, frame, sy * kW + sx)
+                              : kBg;
         const int i = row * kW + col;
-        const uint8_t v = cell_at(slot, frame, i);
-        // A blink only differs from the resting face around the eyes. Drawing
-        // just those cells turns a 672-rectangle repaint into a handful.
-        if (full || v != cell_at(slot, other, i)) {
+        if (!s_shown_valid || v != s_shown[i]) {
           c = colour_of(v, bg);
           want = true;
         }
+        s_shown[i] = v;
       }
 
       if (run_start >= 0 && (!want || c != run_c)) {
@@ -115,6 +127,7 @@ void draw(int slot, int frame, uint16_t bg, bool full) {
       }
     }
   }
+  s_shown_valid = true;
 }
 
 }  // namespace customface
