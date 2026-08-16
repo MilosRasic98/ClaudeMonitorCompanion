@@ -12,13 +12,15 @@ namespace customface {
 namespace {
 
 Preferences s_prefs;
-uint8_t s_data[kTotalBytes];
+uint8_t s_data[kSlots][kSlotBytes];
+
+bool valid(int slot) { return slot >= 0 && slot < kSlots; }
 
 // Four cells per byte, most significant bits first.
-inline uint8_t cell_at(int frame, int i) {
+inline uint8_t cell_at(int slot, int frame, int i) {
   const int idx = frame * kFrameBytes + (i >> 2);
   const int shift = 6 - 2 * (i & 3);
-  return (uint8_t)((s_data[idx] >> shift) & 0x3);
+  return (uint8_t)((s_data[slot][idx] >> shift) & 0x3);
 }
 
 uint16_t colour_of(uint8_t v, uint16_t bg) {
@@ -29,8 +31,8 @@ uint16_t colour_of(uint8_t v, uint16_t bg) {
   }
 }
 
-bool frame_used(int frame) {
-  const uint8_t *p = s_data + frame * kFrameBytes;
+bool frame_used(int slot, int frame) {
+  const uint8_t *p = s_data[slot] + frame * kFrameBytes;
   for (int i = 0; i < kFrameBytes; i++) {
     if (p[i]) return true;
   }
@@ -42,21 +44,44 @@ bool frame_used(int frame) {
 void begin() {
   s_prefs.begin("face", false);
   memset(s_data, 0, sizeof(s_data));
-  s_prefs.getBytes("bmp", s_data, sizeof(s_data));
+  // One NVS key per slot, so saving one face does not rewrite the others.
+  for (int i = 0; i < kSlots; i++) {
+    char k[8];
+    snprintf(k, sizeof(k), "bmp%d", i);
+    s_prefs.getBytes(k, s_data[i], kSlotBytes);
+  }
 }
 
-bool store(const uint8_t *in, size_t len) {
-  if (len != (size_t)kTotalBytes) return false;
-  memcpy(s_data, in, kTotalBytes);
-  s_prefs.putBytes("bmp", s_data, kTotalBytes);
+bool store(int slot, const uint8_t *in, size_t len) {
+  if (!valid(slot) || len != (size_t)kSlotBytes) return false;
+  memcpy(s_data[slot], in, kSlotBytes);
+  char k[8];
+  snprintf(k, sizeof(k), "bmp%d", slot);
+  s_prefs.putBytes(k, s_data[slot], kSlotBytes);
   return true;
 }
 
-const uint8_t *data() { return s_data; }
-bool has_drawing() { return frame_used(0); }
-bool has_blink() { return frame_used(1); }
+const uint8_t *data(int slot) { return s_data[valid(slot) ? slot : 0]; }
+bool has_drawing(int slot) { return valid(slot) && frame_used(slot, 0); }
+bool has_blink(int slot) { return valid(slot) && frame_used(slot, 1); }
 
-void draw(int frame, uint16_t bg, bool full) {
+bool any_drawing() {
+  for (int i = 0; i < kSlots; i++) {
+    if (has_drawing(i)) return true;
+  }
+  return false;
+}
+
+int used_count() {
+  int n = 0;
+  for (int i = 0; i < kSlots; i++) {
+    if (has_drawing(i)) n++;
+  }
+  return n;
+}
+
+void draw(int slot, int frame, uint16_t bg, bool full) {
+  if (!valid(slot)) return;
   const int other = frame ^ 1;
 
   for (int row = 0; row < kH; row++) {
@@ -70,10 +95,10 @@ void draw(int frame, uint16_t bg, bool full) {
 
       if (col < kW) {
         const int i = row * kW + col;
-        const uint8_t v = cell_at(frame, i);
+        const uint8_t v = cell_at(slot, frame, i);
         // A blink only differs from the resting face around the eyes. Drawing
         // just those cells turns a 672-rectangle repaint into a handful.
-        if (full || v != cell_at(other, i)) {
+        if (full || v != cell_at(slot, other, i)) {
           c = colour_of(v, bg);
           want = true;
         }

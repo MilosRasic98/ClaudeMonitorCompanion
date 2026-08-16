@@ -80,6 +80,7 @@ bool s_limit_on = false;
 // The user-drawn face, and which of its two frames is currently on screen.
 bool s_custom_drawn = false;
 int s_custom_frame = 0;
+int s_custom_slot = -1;
 
 // Blink is an overlay on whatever the mood is doing, not a mood of its own.
 uint32_t s_blink_at = 0;
@@ -399,8 +400,20 @@ void apply_pending() {
   if (delta) {
     s_want_style_delta = (int8_t)(s_want_style_delta - delta);
     const int n = (int)Style::Count;
-    s_style = (Style)((((int)s_style + delta) % n + n) % n);
+    const int step = delta > 0 ? 1 : -1;
+    int next = (int)s_style;
+    // Step past custom slots with nothing drawn in them. Bounded by n so an
+    // empty roster cannot spin forever.
+    for (int moved = 0; moved < abs((int)delta); moved++) {
+      for (int guard = 0; guard < n; guard++) {
+        next = ((next + step) % n + n) % n;
+        const int cs = custom_slot((Style)next);
+        if (cs < 0 || customface::has_drawing(cs)) break;
+      }
+    }
+    s_style = (Style)next;
     config::set("style", (int32_t)s_style);
+    Serial.printf("style : %s\n", style_name());
     s_acc_drawn = false;
     s_acc_dx = s_acc_dy = 0;
     repaint();
@@ -443,19 +456,21 @@ void render(Mood m, uint8_t energy, uint32_t now) {
   // is nothing for the eye or accessory code to add. It still blinks, if a
   // blink frame was drawn, and it still turns red when the mascot wants
   // something — mood shows through the field, not the artwork.
-  if (m != Mood::Limit && s_style == Style::Custom && customface::has_drawing()) {
+  const int slot = custom_slot(s_style);
+  if (m != Mood::Limit && slot >= 0 && customface::has_drawing(slot)) {
     const float stretch = blink_stretch(m);
     const bool closed =
-        customface::has_blink() && stretch > 0.0f &&
+        customface::has_blink(slot) && stretch > 0.0f &&
         blink_openness(now, energy, stretch) < 0.5f;
     const int frame = closed ? 1 : 0;
 
-    if (!s_custom_drawn || frame != s_custom_frame) {
-      const bool first = !s_custom_drawn;
+    if (!s_custom_drawn || frame != s_custom_frame || slot != s_custom_slot) {
+      const bool first = !s_custom_drawn || slot != s_custom_slot;
       if (first) display::fill_rect(0, 0, LCD_W, LCD_H, s_bg);
-      customface::draw(frame, s_bg, first);
+      customface::draw(slot, frame, s_bg, first);
       s_custom_drawn = true;
       s_custom_frame = frame;
+      s_custom_slot = slot;
       s_first_frame = true;   // eyes repaint wholesale if the style changes back
       s_acc_drawn = false;
     }

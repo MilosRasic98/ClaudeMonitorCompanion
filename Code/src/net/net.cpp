@@ -173,7 +173,12 @@ String config_json() {
     j += "\""; j += mood::name((mood::Mood)m); j += "\"";
   }
   j += "],";
-  j += "\"has_custom_face\":"; j += customface::has_drawing() ? "true" : "false"; j += ",";
+  j += "\"custom_faces\":[";
+  for (int i = 0; i < customface::kSlots; i++) {
+    if (i) j += ",";
+    j += customface::has_drawing(i) ? "true" : "false";
+  }
+  j += "],";
   j += "\"view\":\""; j += views::name(); j += "\",";
   j += "\"clock_ok\":"; j += usage::clock_valid() ? "true" : "false"; j += ",";
   j += "\"window_remaining_s\":"; j += usage::remaining_s(); j += ",";
@@ -356,13 +361,25 @@ void install_routes() {
   // 672 characters, which is nothing, and hex is trivially inspectable with
   // curl when something looks scrambled on the panel.
   s_server.on("/api/face", HTTP_GET, []() {
-    const uint8_t *d = customface::data();
+    const int slot = s_server.hasArg("slot") ? s_server.arg("slot").toInt() : 0;
+    if (slot < 0 || slot >= customface::kSlots) {
+      s_server.send(400, "text/plain", "bad slot\n");
+      return;
+    }
+    const uint8_t *d = customface::data(slot);
     String j;
-    j.reserve(customface::kTotalBytes * 2 + 64);
-    j += "{\"w\":"; j += customface::kW;
+    j.reserve(customface::kSlotBytes * 2 + 128);
+    j += "{\"slot\":"; j += slot;
+    j += ",\"slots\":"; j += customface::kSlots;
+    j += ",\"w\":"; j += customface::kW;
     j += ",\"h\":"; j += customface::kH;
-    j += ",\"frames\":2,\"data\":\"";
-    for (int i = 0; i < customface::kTotalBytes; i++) {
+    j += ",\"frames\":2,\"used\":[";
+    for (int i = 0; i < customface::kSlots; i++) {
+      if (i) j += ",";
+      j += customface::has_drawing(i) ? "true" : "false";
+    }
+    j += "],\"data\":\"";
+    for (int i = 0; i < customface::kSlotBytes; i++) {
       const char hex[] = "0123456789abcdef";
       j += hex[d[i] >> 4];
       j += hex[d[i] & 0xF];
@@ -373,16 +390,21 @@ void install_routes() {
   });
 
   s_server.on("/api/face", HTTP_POST, []() {
+    const int slot = s_server.hasArg("slot") ? s_server.arg("slot").toInt() : 0;
+    if (slot < 0 || slot >= customface::kSlots) {
+      s_server.send(400, "text/plain", "bad slot\n");
+      return;
+    }
     const String hex = s_server.arg("data");
-    if (hex.length() != (unsigned)(customface::kTotalBytes * 2)) {
+    if (hex.length() != (unsigned)(customface::kSlotBytes * 2)) {
       char msg[64];
       snprintf(msg, sizeof(msg), "need %d hex chars, got %u\n",
-               customface::kTotalBytes * 2, (unsigned)hex.length());
+               customface::kSlotBytes * 2, (unsigned)hex.length());
       s_server.send(400, "text/plain", msg);
       return;
     }
-    static uint8_t buf[customface::kTotalBytes];
-    for (int i = 0; i < customface::kTotalBytes; i++) {
+    static uint8_t buf[customface::kSlotBytes];
+    for (int i = 0; i < customface::kSlotBytes; i++) {
       const int hi = hexval(hex[i * 2]), lo = hexval(hex[i * 2 + 1]);
       if (hi < 0 || lo < 0) {
         s_server.send(400, "text/plain", "bad hex\n");
@@ -390,7 +412,7 @@ void install_routes() {
       }
       buf[i] = (uint8_t)((hi << 4) | lo);
     }
-    if (!customface::store(buf, sizeof(buf))) {
+    if (!customface::store(slot, buf, sizeof(buf))) {
       s_server.send(400, "text/plain", "rejected\n");
       return;
     }

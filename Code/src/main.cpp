@@ -230,8 +230,7 @@ void handle_command(char c) {
     case '[':
     case ']':
       face::cycle_style(c == ']' ? +1 : -1);
-      Serial.printf("style -> %s\n", face::style_name());
-      return;
+      return;  // the render task logs the result; reading it here would be stale
     // Not printing the name: the change is applied by the render task, so
     // reading it here would report the previous view.
     case 'v': views::cycle(1); Serial.println("next view"); return;

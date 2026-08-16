@@ -112,12 +112,20 @@ const StyleInfo kStyles[(int)Style::Count] = {
     {"round",     true,  false,  ROUND_EYE_W,  ROUND_EYE_H,  1,      true},
     {"pixel",     false, false,  0,            0,            0,      true},
     {"shades",    false, false,  0,            0,            0,      true},
-    // The custom face is drawn wholesale by customface.cpp; the eye machinery
+    // The custom faces are drawn wholesale by customface.cpp; the eye machinery
     // and the accessory machinery both sit out.
-    {"custom",    false, false,  0,            0,            0,      false},
+    {"custom1",   false, false,  0,            0,            0,      false},
+    {"custom2",   false, false,  0,            0,            0,      false},
+    {"custom3",   false, false,  0,            0,            0,      false},
+    {"custom4",   false, false,  0,            0,            0,      false},
 };
 
 }  // namespace
+
+int custom_slot(Style s) {
+  const int i = (int)s - (int)Style::Custom0;
+  return (i >= 0 && i < (int)Style::Count - (int)Style::Custom0) ? i : -1;
+}
 
 const StyleInfo &style_info(Style s) {
   const int i = (int)s;

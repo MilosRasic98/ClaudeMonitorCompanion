@@ -13,7 +13,12 @@ enum class Style : uint8_t {
   Round,   // round spectacles with pupils inside, grill mouth
   Pixel,   // chunky rectangular glasses with glints, open smile
   Shades,  // deal-with-it sunglasses and a moustache
-  Custom,  // whatever the user drew on the settings page
+  // Four slots the user draws on the settings page. Empty ones are skipped when
+  // swiping, so they are never dead screens.
+  Custom0,
+  Custom1,
+  Custom2,
+  Custom3,
   Count,
 };
 
@@ -28,6 +33,9 @@ struct StyleInfo {
 };
 
 const StyleInfo &style_info(Style s);
+
+// -1 for the built-in styles, otherwise the custom slot index.
+int custom_slot(Style s);
 
 // Static art for a style, drawn once when the style or its offset changes.
 void draw_accessories(Style s, int dx, int dy, uint16_t orange);
