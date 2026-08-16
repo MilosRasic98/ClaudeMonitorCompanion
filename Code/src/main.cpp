@@ -1,4 +1,4 @@
-// MR26 Claude Notifier — mascot face.
+// Claude Monitor Companion — mascot face.
 //
 // A Waveshare ESP32-S3-Touch-LCD-1.69 sitting in a 3D-printed shell shaped like
 // the Claude mascot. The screen is its face: an orange field with two black
@@ -259,7 +259,7 @@ void setup() {
   while (!Serial && millis() - t0 < 2000) delay(10);
 
   Serial.println();
-  Serial.println("=== MR26 Claude Notifier ===");
+  Serial.println("=== Claude Monitor Companion ===");
   Serial.printf("chip  : %s rev %d @ %lu MHz\n", ESP.getChipModel(),
                 ESP.getChipRevision(), (unsigned long)getCpuFrequencyMhz());
   Serial.printf("flash : %lu bytes   PSRAM: %lu bytes\n",

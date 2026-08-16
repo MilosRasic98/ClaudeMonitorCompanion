@@ -1,4 +1,4 @@
-# MR26 — Claude Notifier
+# Claude Monitor Companion
 
 A mascot head on a Waveshare ESP32-S3-Touch-LCD-1.69 (1.69" 240x280 touch LCD, ESP32-S3R8,
 8 MB PSRAM, 16 MB flash) that sits on top of a monitor. The screen is its face: two

@@ -1,4 +1,4 @@
-# MR26 Claude Notifier — draft spec
+# Claude Monitor Companion — draft spec
 
 Status: **built and running on hardware.** Everything below is implemented except the bell,
 which is blocked on hardware decisions. Items marked ❓ are still open. Setup and usage:

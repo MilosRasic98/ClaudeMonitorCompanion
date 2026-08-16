@@ -1,4 +1,4 @@
-# MR26 Claude Notifier
+# Claude Monitor Companion
 
 A desk mascot that shows what Claude Code is doing.
 
