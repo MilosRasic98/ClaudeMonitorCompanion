@@ -25,7 +25,7 @@ const Field kFields[] = {
     {"Sound",  "bell_on_alert",      "Ring on alerts",         Type::Bool,    0,     1, 1,                      "Anything that turns the screen red", nullptr, nullptr},
     {"Sound",  "bell_on_error",      "Ring on errors",         Type::Bool,    0,     1, 1,                      nullptr, nullptr, nullptr},
 
-    {"Face",   "style",              "Face style",             Type::Enum,    0,     4, 0,                      "Also changed by swiping the screen", "plain,grin,round,pixel,shades", nullptr},
+    {"Face",   "style",              "Face style",             Type::Enum,    0,     5, 0,                      "Also changed by swiping the screen", "plain,grin,round,pixel,shades,custom", nullptr},
     {"Face",   "orange",             "Background shade",       Type::Enum,    0,     3, ORANGE_DEFAULT,         "Match it to your printed shell by eye", "saturated,bright,deep,amber", nullptr},
     {"Face",   "eye_w",              "Eye width",              Type::Int,    10,   100, EYE_W,                  nullptr, nullptr, nullptr},
     {"Face",   "eye_h",              "Eye height",             Type::Int,    10,   200, EYE_H,                  nullptr, nullptr, nullptr},

@@ -7,6 +7,7 @@
 
 #include "bell.h"
 #include "config.h"
+#include "customface.h"
 #include "face.h"
 #include "mood.h"
 #include "usage.h"
@@ -117,6 +118,13 @@ void start_ap() {
   }
 }
 
+int hexval(char c) {
+  if (c >= '0' && c <= '9') return c - '0';
+  if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+  if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+  return -1;
+}
+
 bool authorised() {
   if (!s_server.hasHeader("Authorization")) return false;
   String got = s_server.header("Authorization");
@@ -165,6 +173,7 @@ String config_json() {
     j += "\""; j += mood::name((mood::Mood)m); j += "\"";
   }
   j += "],";
+  j += "\"has_custom_face\":"; j += customface::has_drawing() ? "true" : "false"; j += ",";
   j += "\"view\":\""; j += views::name(); j += "\",";
   j += "\"clock_ok\":"; j += usage::clock_valid() ? "true" : "false"; j += ",";
   j += "\"window_remaining_s\":"; j += usage::remaining_s(); j += ",";
@@ -341,6 +350,52 @@ void install_routes() {
     usage::note_limits(pct, (time_t)s_server.arg("reset").toInt(), wpct,
                        (time_t)s_server.arg("wreset").toInt());
     s_server.send(200, "text/plain", "ok\n");
+  });
+
+  // The user-drawn face. Hex rather than raw bytes or base64: the payload is
+  // 672 characters, which is nothing, and hex is trivially inspectable with
+  // curl when something looks scrambled on the panel.
+  s_server.on("/api/face", HTTP_GET, []() {
+    const uint8_t *d = customface::data();
+    String j;
+    j.reserve(customface::kTotalBytes * 2 + 64);
+    j += "{\"w\":"; j += customface::kW;
+    j += ",\"h\":"; j += customface::kH;
+    j += ",\"frames\":2,\"data\":\"";
+    for (int i = 0; i < customface::kTotalBytes; i++) {
+      const char hex[] = "0123456789abcdef";
+      j += hex[d[i] >> 4];
+      j += hex[d[i] & 0xF];
+    }
+    j += "\"}";
+    s_server.sendHeader("Cache-Control", "no-store");
+    s_server.send(200, "application/json", j);
+  });
+
+  s_server.on("/api/face", HTTP_POST, []() {
+    const String hex = s_server.arg("data");
+    if (hex.length() != (unsigned)(customface::kTotalBytes * 2)) {
+      char msg[64];
+      snprintf(msg, sizeof(msg), "need %d hex chars, got %u\n",
+               customface::kTotalBytes * 2, (unsigned)hex.length());
+      s_server.send(400, "text/plain", msg);
+      return;
+    }
+    static uint8_t buf[customface::kTotalBytes];
+    for (int i = 0; i < customface::kTotalBytes; i++) {
+      const int hi = hexval(hex[i * 2]), lo = hexval(hex[i * 2 + 1]);
+      if (hi < 0 || lo < 0) {
+        s_server.send(400, "text/plain", "bad hex\n");
+        return;
+      }
+      buf[i] = (uint8_t)((hi << 4) | lo);
+    }
+    if (!customface::store(buf, sizeof(buf))) {
+      s_server.send(400, "text/plain", "rejected\n");
+      return;
+    }
+    face::refresh();
+    s_server.send(200, "text/plain", "saved\n");
   });
 
   s_server.on("/health", HTTP_GET, handle_health);

@@ -14,6 +14,7 @@
 
 #include "bell.h"
 #include "config.h"
+#include "customface.h"
 #include "display.h"
 #include "face.h"
 #include "mood.h"
@@ -280,6 +281,7 @@ void setup() {
     while (true) delay(1000);
   }
 
+  customface::begin();
   usage::begin();
   views::begin();
   face::begin();

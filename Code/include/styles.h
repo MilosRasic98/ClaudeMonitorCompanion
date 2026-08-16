@@ -13,6 +13,7 @@ enum class Style : uint8_t {
   Round,   // round spectacles with pupils inside, grill mouth
   Pixel,   // chunky rectangular glasses with glints, open smile
   Shades,  // deal-with-it sunglasses and a moustache
+  Custom,  // whatever the user drew on the settings page
   Count,
 };
 

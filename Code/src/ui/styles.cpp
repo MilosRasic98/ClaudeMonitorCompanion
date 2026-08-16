@@ -112,6 +112,9 @@ const StyleInfo kStyles[(int)Style::Count] = {
     {"round",     true,  false,  ROUND_EYE_W,  ROUND_EYE_H,  1,      true},
     {"pixel",     false, false,  0,            0,            0,      true},
     {"shades",    false, false,  0,            0,            0,      true},
+    // The custom face is drawn wholesale by customface.cpp; the eye machinery
+    // and the accessory machinery both sit out.
+    {"custom",    false, false,  0,            0,            0,      false},
 };
 
 }  // namespace

@@ -4,6 +4,7 @@
 #include <math.h>
 
 #include "config.h"
+#include "customface.h"
 #include "display.h"
 #include "pins.h"
 #include "tuning.h"
@@ -75,6 +76,10 @@ volatile uint32_t s_poke_until = 0;
 // The limit face owns the whole screen while it is up.
 bool s_limit_active = false;
 bool s_limit_on = false;
+
+// The user-drawn face, and which of its two frames is currently on screen.
+bool s_custom_drawn = false;
+int s_custom_frame = 0;
 
 // Blink is an overlay on whatever the mood is doing, not a mood of its own.
 uint32_t s_blink_at = 0;
@@ -372,6 +377,7 @@ void reload_from_config() {
 // Full repaint. Only ever called on a style or colour change, never per frame.
 void repaint() {
   display::fill_rect(0, 0, LCD_W, LCD_H, s_bg);
+  s_custom_drawn = false;
   if (style_info(s_style).has_accessories) {
     draw_accessories(s_style, s_acc_dx, s_acc_dy, s_bg);
     s_acc_drawn = true;
@@ -432,6 +438,40 @@ void render(Mood m, uint8_t energy, uint32_t now) {
 
   const uint32_t in_mood = mood::in_mood_ms();
   const StyleInfo &info = style_info(s_style);
+
+    // The custom face owns the whole panel: the user drew every cell, so there
+  // is nothing for the eye or accessory code to add. It still blinks, if a
+  // blink frame was drawn, and it still turns red when the mascot wants
+  // something — mood shows through the field, not the artwork.
+  if (m != Mood::Limit && s_style == Style::Custom && customface::has_drawing()) {
+    const float stretch = blink_stretch(m);
+    const bool closed =
+        customface::has_blink() && stretch > 0.0f &&
+        blink_openness(now, energy, stretch) < 0.5f;
+    const int frame = closed ? 1 : 0;
+
+    if (!s_custom_drawn || frame != s_custom_frame) {
+      const bool first = !s_custom_drawn;
+      if (first) display::fill_rect(0, 0, LCD_W, LCD_H, s_bg);
+      customface::draw(frame, s_bg, first);
+      s_custom_drawn = true;
+      s_custom_frame = frame;
+      s_first_frame = true;   // eyes repaint wholesale if the style changes back
+      s_acc_drawn = false;
+    }
+    const uint8_t bl = backlight_for(m);
+    if (bl != s_backlight) {
+      s_backlight = bl;
+      display::backlight(bl);
+    }
+    return;
+  }
+  if (s_custom_drawn) {
+    s_custom_drawn = false;
+    display::fill_rect(0, 0, LCD_W, LCD_H, s_bg);
+    s_first_frame = true;
+    s_acc_drawn = false;
+  }
 
   // The limit face replaces everything, so it short-circuits the eye and
   // accessory paths rather than layering on top of them.
