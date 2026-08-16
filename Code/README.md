@@ -193,8 +193,30 @@ than dressed up as a quota.
 Wall-clock time comes from NTP through the POSIX timezone string in settings. Until the first
 sync the gauge reads `NO CLOCK` rather than guessing.
 
-Text is drawn with a 3x5 pixel font scaled by whole numbers, so glyph edges land on the same
-grid as the face.
+### How often it refreshes
+
+The percentage comes from the host, so it updates whenever the status line runs: on every
+assistant message, and at least once a minute via `refreshInterval`. Claude Code debounces
+those at 300 ms.
+
+The countdown does not depend on the host at all. `resets_at` is an absolute epoch, so once
+the board has it, NTP time is enough to tick the remaining time down every minute — even
+with Claude Code closed.
+
+### Drawing a smooth ring cheaply
+
+The ring is a real circle, not a ring of blocks. The two costs are worth separating: testing
+every pixel in the bounding box is a few thousand float operations and costs nothing, while
+one SPI transaction per pixel would be ruinous. So each row is scanned, runs of identical
+colour are coalesced, and one rectangle is pushed per run — a few hundred transactions for
+the whole ring, and only when the value changes.
+
+The unfilled part of the track is the background colour darkened at runtime, so it reads
+correctly on the orange field and on the red alert field without a second hardcoded colour.
+
+Everything else — the percentage, the countdown, the face — stays on the pixel grid. The
+ring is the one place a curve beats blocks, because a dial has to be readable at a glance
+from across a desk.
 
 ## Faces
 

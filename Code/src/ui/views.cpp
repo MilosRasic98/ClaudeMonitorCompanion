@@ -28,101 +28,149 @@ uint16_t s_bg = 0;
 // redraw once a second, not sixty times.
 void band(int y, int h) { display::fill_rect(0, y, LCD_W, h, s_bg); }
 
+// Erase only a centred column. The percentage sits inside the ring, and a
+// full-width erase would cut a slot straight through it.
+void band_centered(int y, int h, int w) {
+  display::fill_rect((LCD_W - w) / 2, y, w, h, s_bg);
+}
+
 void centered(int y, const char *s, int scale) {
   text::draw_centered(y, s, scale, kBlack);
 }
 
 // ------------------------------------------------------------------ gauge --
 
-// A ring of chunky blocks rather than a smooth arc. A real anti-aliased arc
-// would fight the pixel-art face, and drawing one on this grid means testing
-// every cell in a 200x200 box — 1600 SPI transactions. Twenty-four positioned
-// blocks cost twenty-four, and read better.
+// A real circle, not blocks. The earlier version stepped chunky squares around
+// the circumference to stay on the pixel grid, and it was simply hard to read.
+//
+// The trick that makes a smooth ring affordable is separating the two costs.
+// Testing every pixel in the bounding box is nothing — a few thousand float
+// operations. What would have been ruinous is one SPI transaction per pixel. So
+// each row is scanned, runs of identical colour are coalesced, and one rectangle
+// is pushed per run: a few hundred transactions for the whole ring, and only
+// when the value actually changes.
 const int kRingCx = LCD_W / 2;
-const int kRingCy = 112;
-const int kRingR = 84;
-const int kRingSegs = 24;
-const int kRingBlock = 14;
+const int kRingCy = 106;
+const int kRingRo = 86;   // outer radius
+const int kRingRi = 66;   // inner radius
 
-int s_last_filled = -1;
+int s_last_pct_drawn = -999;
 char s_last_big[8] = "";
 char s_last_sub[16] = "";
 
-void ring_block(int i, bool on) {
-  const float a = ((float)i * 360.0f / kRingSegs - 90.0f) * (float)PI / 180.0f;
-  const int q = config::v::grid_q();
-  const int cx = kRingCx + (int)(kRingR * cosf(a));
-  const int cy = kRingCy + (int)(kRingR * sinf(a));
-  const int x = (cx - kRingBlock / 2) / q * q;
-  const int y = (cy - kRingBlock / 2) / q * q;
-  if (on) {
-    display::fill_rect(x, y, kRingBlock, kRingBlock, kBlack);
-  } else {
-    // Unfilled positions stay as a stub so the ring reads as a dial rather
-    // than a partial arc floating in space.
-    display::fill_rect(x, y, kRingBlock, kRingBlock, s_bg);
-    display::fill_rect(x + kRingBlock / 4, y + kRingBlock / 4, kRingBlock / 2,
-                       kRingBlock / 2, kBlack);
-  }
+// The unfilled part of the ring is the background darkened, so the track reads
+// on both the orange field and the red alert field without a hardcoded colour.
+uint16_t darken(uint16_t swapped) {
+  const uint16_t c = (uint16_t)((swapped >> 8) | (swapped << 8));  // undo the byte swap
+  uint16_t r = (c >> 11) & 0x1F, g = (c >> 5) & 0x3F, b = c & 0x1F;
+  r = (uint16_t)(r * 45 / 100);
+  g = (uint16_t)(g * 45 / 100);
+  b = (uint16_t)(b * 45 / 100);
+  const uint16_t out = (uint16_t)((r << 11) | (g << 5) | b);
+  return (uint16_t)((out >> 8) | (out << 8));
 }
 
-void draw_ring(float frac) {
+void draw_arc(float frac) {
   if (frac < 0.0f) frac = 0.0f;
   if (frac > 1.0f) frac = 1.0f;
-  const int filled = (int)(frac * kRingSegs + 0.5f);
-  if (filled == s_last_filled) return;
-  s_last_filled = filled;
-  for (int i = 0; i < kRingSegs; i++) ring_block(i, i < filled);
+  const float sweep = frac * 2.0f * (float)PI;
+  const uint16_t track = darken(s_bg);
+  const int ro2 = kRingRo * kRingRo, ri2 = kRingRi * kRingRi;
+
+  for (int y = kRingCy - kRingRo; y <= kRingCy + kRingRo; y++) {
+    if (y < 0 || y >= LCD_H) continue;
+    const int dy = y - kRingCy;
+    int run_x = -1;
+    uint16_t run_c = 0;
+
+    // One past the right edge, so a run touching the edge still gets flushed.
+    for (int x = kRingCx - kRingRo; x <= kRingCx + kRingRo + 1; x++) {
+      bool on = false;
+      uint16_t c = 0;
+      if (x <= kRingCx + kRingRo) {
+        const int dx = x - kRingCx;
+        const int d2 = dx * dx + dy * dy;
+        if (d2 <= ro2 && d2 >= ri2) {
+          // Angle measured clockwise from twelve o'clock.
+          float a = atan2f((float)dx, (float)-dy);
+          if (a < 0.0f) a += 2.0f * (float)PI;
+          c = (a <= sweep) ? kBlack : track;
+          on = true;
+        }
+      }
+      if (run_x >= 0 && (!on || c != run_c)) {
+        display::fill_rect(run_x, y, x - run_x, 1, run_c);
+        run_x = -1;
+      }
+      if (on && run_x < 0) {
+        run_x = x;
+        run_c = c;
+      }
+    }
+  }
 }
 
 // Only repaint text that actually changed. The percentage moves every few
 // minutes and the countdown once a minute; repainting either at 1 Hz would
 // flicker for no reason.
-void text_slot(char *cache, size_t n, int y, int h, const char *s, int scale) {
+// `clear_w` of 0 means erase the full width; anything else erases a centred
+// column of that width, for text that lives inside the ring.
+void text_slot(char *cache, size_t n, int y, int h, const char *s, int scale,
+               int clear_w) {
   if (strncmp(cache, s, n) == 0) return;
   strncpy(cache, s, n - 1);
   cache[n - 1] = '\0';
-  band(y, h);
+  if (clear_w > 0) band_centered(y, h, clear_w);
+  else band(y, h);
   centered(y, s, scale);
 }
 
 void gauge_static() {
   display::fill_rect(0, 0, LCD_W, LCD_H, s_bg);
-  s_last_filled = -1;
+  centered(2, "5H LIMIT", 2);
+  s_last_pct_drawn = -999;
   s_last_big[0] = '\0';
   s_last_sub[0] = '\0';
-  centered(8, "5H LIMIT", 2);
 }
 
 void gauge_dynamic() {
   char big[8], sub[16];
+  int pct_for_arc;
 
   if (!usage::clock_valid()) {
     snprintf(big, sizeof(big), "--");
     snprintf(sub, sizeof(sub), "NO CLOCK");
-    draw_ring(0.0f);
+    pct_for_arc = 0;
   } else if (usage::host_data()) {
-    snprintf(big, sizeof(big), "%d%%", usage::percent());
+    pct_for_arc = usage::percent();
+    snprintf(big, sizeof(big), "%d%%", pct_for_arc);
     const uint32_t r = usage::remaining_s();
     snprintf(sub, sizeof(sub), "%u:%02u TO RESET", (unsigned)(r / 3600),
              (unsigned)((r % 3600) / 60));
-    draw_ring(usage::fraction());
   } else if (usage::window_start() != 0) {
     // No statusline reporting. Show elapsed time, and say that is what it is,
     // rather than dressing a clock up as a quota.
+    pct_for_arc = (int)(usage::fraction() * 100.0f);
     const uint32_t r = usage::remaining_s();
     snprintf(big, sizeof(big), "%u:%02u", (unsigned)(r / 3600),
              (unsigned)((r % 3600) / 60));
     snprintf(sub, sizeof(sub), "EST - NO HOST");
-    draw_ring(usage::fraction());
   } else {
+    pct_for_arc = 0;
     snprintf(big, sizeof(big), "IDLE");
     snprintf(sub, sizeof(sub), "NO DATA YET");
-    draw_ring(0.0f);
   }
 
-  text_slot(s_last_big, sizeof(s_last_big), 92, 44, big, 8);
-  text_slot(s_last_sub, sizeof(s_last_sub), 232, 14, sub, 2);
+  if (pct_for_arc != s_last_pct_drawn) {
+    s_last_pct_drawn = pct_for_arc;
+    draw_arc(pct_for_arc / 100.0f);
+    s_last_big[0] = '\0';  // the arc redraw covers the text area
+  }
+
+  // 112 wide keeps the erase clear of the ring: the inner radius is 66, and at
+  // the lowest text row the inner chord is still ~122 wide.
+  text_slot(s_last_big, sizeof(s_last_big), kRingCy - 22, 46, big, 8, 112);
+  text_slot(s_last_sub, sizeof(s_last_sub), 226, 14, sub, 2, 0);
 }
 
 // ------------------------------------------------------------------ stats --
