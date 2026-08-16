@@ -17,6 +17,8 @@ bool s_ntp_started = false;
 // Authoritative figures from the host's statusline, when it is running.
 int s_pct = -1;
 time_t s_host_reset = 0;
+uint32_t s_host_seen_ms = 0;
+bool s_host_ever = false;
 
 // Anything before this is the epoch the RTC boots to, not a real time.
 const time_t kPlausibleEpoch = 1700000000;  // late 2023
@@ -75,11 +77,18 @@ void note_limits(int pct, time_t resets_at) {
   if (pct < 0 || pct > 100) return;
   s_pct = pct;
   s_host_reset = resets_at;
+  s_host_seen_ms = millis();
+  s_host_ever = true;
   s_prefs.putInt("pct", s_pct);
   s_prefs.putULong("hreset", (uint32_t)s_host_reset);
 }
 
 int percent() { return host_fresh() ? s_pct : -1; }
+
+int32_t host_age_s() {
+  if (!s_host_ever) return -1;
+  return (int32_t)((millis() - s_host_seen_ms) / 1000);
+}
 bool host_data() { return host_fresh(); }
 
 time_t window_start() { return s_start; }

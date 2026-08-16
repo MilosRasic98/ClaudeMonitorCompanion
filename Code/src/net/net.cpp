@@ -171,6 +171,7 @@ String config_json() {
   j += "\"window_reset\":"; j += (uint32_t)usage::window_reset_at(); j += ",";
   j += "\"prompts\":"; j += usage::prompts(); j += ",";
   j += "\"limit_pct\":"; j += usage::percent(); j += ",";
+  j += "\"limit_age_s\":"; j += usage::host_age_s(); j += ",";
   j += "\"limit_from_host\":"; j += usage::host_data() ? "true" : "false"; j += ",";
   j += "\"ap_mode\":"; j += config::ap_mode() ? "true" : "false"; j += ",";
   j += "\"version\":\"1.0\"}";

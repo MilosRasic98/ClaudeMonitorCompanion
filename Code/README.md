@@ -193,6 +193,12 @@ than dressed up as a quota.
 Wall-clock time comes from NTP through the POSIX timezone string in settings. Until the first
 sync the gauge reads `NO CLOCK` rather than guessing.
 
+**`statusLine` is read when a session starts.** Hooks hot-reload when you edit settings, the
+status line does not — after adding it, restart Claude Code or it will simply never run. The
+gauge shows `EST - NO HOST` until the first report arrives, and `device.limit_age_s` on
+`/api/config` is -1 until then, which is the quickest way to tell "not running" from
+"nothing has changed".
+
 ### How often it refreshes
 
 The percentage comes from the host, so it updates whenever the status line runs: on every

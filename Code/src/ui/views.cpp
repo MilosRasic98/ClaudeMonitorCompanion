@@ -50,7 +50,7 @@ void centered(int y, const char *s, int scale) {
 // is pushed per run: a few hundred transactions for the whole ring, and only
 // when the value actually changes.
 const int kRingCx = LCD_W / 2;
-const int kRingCy = 106;
+const int kRingCy = 120;
 const int kRingRo = 86;   // outer radius
 const int kRingRi = 66;   // inner radius
 
@@ -63,9 +63,12 @@ char s_last_sub[16] = "";
 uint16_t darken(uint16_t swapped) {
   const uint16_t c = (uint16_t)((swapped >> 8) | (swapped << 8));  // undo the byte swap
   uint16_t r = (c >> 11) & 0x1F, g = (c >> 5) & 0x3F, b = c & 0x1F;
-  r = (uint16_t)(r * 45 / 100);
-  g = (uint16_t)(g * 45 / 100);
-  b = (uint16_t)(b * 45 / 100);
+  // 70%, not 45%. Darker than this and the unfilled track is hard to tell from
+  // the black of the filled arc, which is the one distinction the dial exists
+  // to make.
+  r = (uint16_t)(r * 70 / 100);
+  g = (uint16_t)(g * 70 / 100);
+  b = (uint16_t)(b * 70 / 100);
   const uint16_t out = (uint16_t)((r << 11) | (g << 5) | b);
   return (uint16_t)((out >> 8) | (out << 8));
 }
@@ -127,7 +130,7 @@ void text_slot(char *cache, size_t n, int y, int h, const char *s, int scale,
 
 void gauge_static() {
   display::fill_rect(0, 0, LCD_W, LCD_H, s_bg);
-  centered(2, "5H LIMIT", 2);
+  centered(6, "5H LIMIT", 3);
   s_last_pct_drawn = -999;
   s_last_big[0] = '\0';
   s_last_sub[0] = '\0';
@@ -170,7 +173,7 @@ void gauge_dynamic() {
   // 112 wide keeps the erase clear of the ring: the inner radius is 66, and at
   // the lowest text row the inner chord is still ~122 wide.
   text_slot(s_last_big, sizeof(s_last_big), kRingCy - 22, 46, big, 8, 112);
-  text_slot(s_last_sub, sizeof(s_last_sub), 226, 14, sub, 2, 0);
+  text_slot(s_last_sub, sizeof(s_last_sub), 218, 18, sub, 3, 0);
 }
 
 // ------------------------------------------------------------------ stats --

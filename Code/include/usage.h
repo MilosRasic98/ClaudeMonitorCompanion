@@ -39,6 +39,11 @@ void note_limits(int pct, time_t resets_at);
 int percent();
 bool host_data();
 
+// Seconds since the host last reported, or -1 if it never has. The statusline
+// should refresh at least once a minute, so a large value means it is not
+// running rather than that nothing has changed.
+int32_t host_age_s();
+
 time_t window_start();      // 0 if no window is open
 time_t window_reset_at();   // host value when known, else derived; 0 if neither
 uint32_t elapsed_s();
