@@ -200,6 +200,36 @@ than dressed up as a quota.
 Wall-clock time comes from NTP through the POSIX timezone string in settings. Until the first
 sync the gauge reads `NO CLOCK` rather than guessing.
 
+### Platform notes
+
+The two halves are portable to different degrees, and it is worth knowing which is which.
+
+**The hooks are genuinely OS-independent.** They use exec form — `command` plus an `args`
+array — so Claude Code spawns `curl` directly with no shell involved: no quoting rules, no
+PATH surprises. `curl` ships with macOS, with Windows since 1809 (which is below Claude
+Code's own minimum), and with essentially every Linux. The same block works byte-identically
+on all three. Moods, faces, the red field, the exclamation mark and the sounds are all on
+this side.
+
+**The status line is not.** `statusLine` takes only a `command` string — there is no `args`
+field, so it is always run through a shell, and a different shell on each platform. Hence two
+scripts:
+
+| | Script | Needs |
+|---|---|---|
+| macOS, Linux | [tools/statusline.py](tools/statusline.py) | `python3` on PATH |
+| Windows | [tools/statusline.ps1](tools/statusline.ps1) | nothing beyond what Windows ships |
+
+The PowerShell version exists because Python is *not* dependable on Windows — it is usually
+`python` rather than `python3`, and the Microsoft Store stub hijacks the name — whereas
+PowerShell always is. It parses the JSON with `ConvertFrom-Json` and posts with `curl.exe`,
+both built in.
+
+Two Windows details the generator handles for you, and which are easy to get wrong by hand:
+the script path must use **forward slashes**, because Claude Code routes the status line
+through Git Bash when it is installed and Git Bash silently eats backslashes in a Windows
+path; and the path is **double quoted**, so a space in it does not split the command.
+
 **The status line only runs in the CLI.** The desktop app has no status bar, so it never
 invokes the command — confirmed by instrumenting the script and watching a full
 `refreshInterval` pass with zero calls. If you work in the desktop app, keep a CLI session
@@ -476,7 +506,10 @@ Everything below was measured on the real board, not inferred.
   should ring it is already wired — see Sound below.
 - Eye geometry is placeholder until the shell's screen cutout is measured.
 - Which of the four orange candidates matches the filament.
-- Touch coordinate orientation is unverified against a real finger. Swipe cycling keys off
+- Touch coordinate orientation is unverified against a real finger.
+- `tools/statusline.ps1` has been written and reviewed but never executed — it was developed
+  on a Mac with no PowerShell available. The logic mirrors the Python version, which is
+  tested, but treat the first Windows run as the real test. Swipe cycling keys off
   whichever axis dominates, so a horizontal flick works even if the driver's axes turn out
   swapped; only the direction could need flipping, via `SWIPE_INVERT`.
 - Hats are not rendered. The top hat and the sailor hat in the reference photos sit above

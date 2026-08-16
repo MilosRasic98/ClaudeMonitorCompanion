@@ -52,6 +52,16 @@ geometry, mood thresholds, brightness, Wi-Fi — all editable from a phone. Flas
 never open the firmware again. Get the Wi-Fi wrong and the board hosts its own access point
 so you can fix it.
 
+## Platforms
+
+Everything runs from the Claude Code **CLI** — the desktop app is not involved and cannot be,
+since it has no status bar to run a status line in. Keep a CLI session open alongside the app
+if you use both; an idle one is enough.
+
+Hooks are exec form and identical on macOS, Linux and Windows. The status line needs a
+per-platform script, and the generator emits the right one — Python on Unix, PowerShell on
+Windows, where it needs nothing that Windows does not already ship.
+
 ## Hardware
 
 - [Waveshare ESP32-S3-Touch-LCD-1.69](https://www.waveshare.com/esp32-s3-touch-lcd-1.69.htm)

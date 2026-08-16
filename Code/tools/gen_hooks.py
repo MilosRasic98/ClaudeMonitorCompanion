@@ -2,8 +2,12 @@
 """Print the Claude Code hook config for the mascot.
 
 Usage:
-    python3 tools/gen_hooks.py <host> <token>
+    python3 tools/gen_hooks.py <host> <token> [--windows | --unix]
+
     python3 tools/gen_hooks.py 192.168.1.42 my-token
+
+The platform is detected from the machine you run this on; the flags override
+it, which is what you want when generating a config for someone else.
 
 Use the board's IP, not its .local name. mDNS resolution was measured at 5.1 s
 per lookup on macOS with no caching, which blows straight past the hook's 2 s
@@ -99,12 +103,45 @@ def entry(host: str, token: str, event: str) -> dict:
     }
 
 
+def statusline_command(host: str, token: str, windows: bool) -> str:
+    """The status line has no exec form.
+
+    Unlike hooks, statusLine takes a shell string rather than an argv array, so
+    it cannot be made byte-identical across platforms. It also runs through a
+    different shell on each: sh on Unix, Git Bash or PowerShell on Windows. So
+    there are two scripts and two command lines.
+
+    On Windows the path must use forward slashes and be double quoted. Git Bash
+    treats unquoted backslashes as escapes and silently mangles the path;
+    PowerShell is happy with forward slashes either way; and both honour double
+    quotes, which matters the moment the path contains a space.
+    """
+    here = os.path.dirname(os.path.abspath(__file__))
+
+    if windows:
+        script = os.path.join(here, "statusline.ps1").replace("\\", "/")
+        # Double quotes, because the path may contain spaces and they work in
+        # both shells Claude Code might use here.
+        return (
+            "powershell -NoProfile -ExecutionPolicy Bypass "
+            f'-File "{script}" {host} {token}'
+        )
+
+    script = shlex.quote(os.path.join(here, "statusline.py"))
+    return f"python3 {script} {shlex.quote(host)} {shlex.quote(token)}"
+
+
 def main() -> int:
-    if len(sys.argv) != 3:
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    flags = {a for a in sys.argv[1:] if a.startswith("--")}
+    if len(args) != 2 or flags - {"--windows", "--unix"}:
         print(__doc__.strip(), file=sys.stderr)
         return 2
 
-    host, token = sys.argv[1], sys.argv[2]
+    host, token = args
+    windows = "--windows" in flags or (
+        "--unix" not in flags and sys.platform.startswith("win")
+    )
 
     hooks: dict = {}
     for hook_name, matcher, event in MAPPING:
@@ -115,13 +152,9 @@ def main() -> int:
     # The status line is the only place Claude Code exposes rate-limit figures,
     # so the usage gauge depends on it. refreshInterval keeps the countdown
     # moving while you are idle, when no assistant message would trigger it.
-    # statusLine takes a shell string, not an argv array, so the path has to be
-    # quoted -- this project's own directory has spaces in it.
-    here = os.path.dirname(os.path.abspath(__file__))
-    script = shlex.quote(os.path.join(here, "statusline.py"))
     statusline = {
         "type": "command",
-        "command": f"python3 {script} {shlex.quote(host)} {shlex.quote(token)}",
+        "command": statusline_command(host, token, windows),
         "refreshInterval": 60,
     }
 
