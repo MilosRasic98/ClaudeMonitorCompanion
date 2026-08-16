@@ -9,14 +9,15 @@
 // already receives, so the board can say how far through the window you are and
 // when it resets.
 //
-// What it deliberately does NOT claim to know is how much of the quota you have
-// actually consumed. No Claude Code hook reports that — the only limit-related
-// signal is StopFailure/rate_limit, which arrives once you have already hit it.
-// So this measures time, and says so on screen.
+// Real consumption comes from the host. Claude Code's *statusline* JSON carries
+// `rate_limits.five_hour.used_percentage` and `.resets_at` — hooks do not — so a
+// statusline script forwards those to the board and they are authoritative when
+// present.
 //
-// Caveat worth remembering: the board only sees prompts while it is powered and
-// connected. Work done with the board off does not move the window, so after an
-// outage the reset time can read early.
+// Without them the board falls back to timing the window from the prompts it has
+// seen. That fallback is only ever a lower bound: it cannot know about work done
+// before the board was switched on, so it reads the window as opening later than
+// it really did.
 
 namespace usage {
 
@@ -30,8 +31,16 @@ bool clock_valid();
 // Call when the host reports a user prompt.
 void note_prompt();
 
+// Real figures from the statusline. pct is 0..100; resets_at is epoch seconds.
+void note_limits(int pct, time_t resets_at);
+
+// -1 when the host has never reported. Callers must show something honest
+// rather than inventing a number.
+int percent();
+bool host_data();
+
 time_t window_start();      // 0 if no window is open
-time_t window_reset_at();   // 0 if no window is open
+time_t window_reset_at();   // host value when known, else derived; 0 if neither
 uint32_t elapsed_s();
 uint32_t remaining_s();
 float fraction();           // 0..1 through the window

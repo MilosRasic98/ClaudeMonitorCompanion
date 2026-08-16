@@ -36,8 +36,9 @@ tracks itself:
 | `ANGRY` | you poked it five times in four seconds |
 | `LIMIT` | usage limit reached — red field, blinking `!` |
 
-**Three screens.** Swipe up or down for the mascot, a usage-window gauge showing time left
-and when the limit resets, or a plain stats screen. Swipe sideways to change the face.
+**Three screens.** Swipe up or down for the mascot, a ring gauge showing how much of your
+five-hour limit is used and how long until it resets, or a plain stats screen. Swipe sideways
+to change the face.
 
 **Five faces**, taken from the printed mascot's variants: bare eyes, a `><` grin, round
 spectacles with a grill mouth, chunky pixel glasses with a smile, and deal-with-it shades

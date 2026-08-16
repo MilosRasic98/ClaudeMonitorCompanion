@@ -170,6 +170,8 @@ String config_json() {
   j += "\"window_remaining_s\":"; j += usage::remaining_s(); j += ",";
   j += "\"window_reset\":"; j += (uint32_t)usage::window_reset_at(); j += ",";
   j += "\"prompts\":"; j += usage::prompts(); j += ",";
+  j += "\"limit_pct\":"; j += usage::percent(); j += ",";
+  j += "\"limit_from_host\":"; j += usage::host_data() ? "true" : "false"; j += ",";
   j += "\"ap_mode\":"; j += config::ap_mode() ? "true" : "false"; j += ",";
   j += "\"version\":\"1.0\"}";
 
@@ -318,6 +320,22 @@ void install_routes() {
       s_server.send(200, "text/plain", "ok\n");
     });
   }
+
+  // Real rate-limit figures, forwarded by the host's statusline script. Query
+  // parameters rather than a body, so the sender stays a bare curl invocation.
+  s_server.on("/limits", HTTP_POST, []() {
+    if (!authorised()) {
+      s_server.send(401, "text/plain", "bad token\n");
+      return;
+    }
+    if (!s_server.hasArg("pct")) {
+      s_server.send(400, "text/plain", "need pct\n");
+      return;
+    }
+    usage::note_limits(s_server.arg("pct").toInt(),
+                       (time_t)s_server.arg("reset").toInt());
+    s_server.send(200, "text/plain", "ok\n");
+  });
 
   s_server.on("/health", HTTP_GET, handle_health);
 

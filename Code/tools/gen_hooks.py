@@ -10,7 +10,10 @@ per lookup on macOS with no caching, which blows straight past the hook's 2 s
 timeout and makes every hook silently fail. Give the board a DHCP reservation
 so the address is stable.
 
-Paste the output into the "hooks" key of ~/.claude/settings.json.
+Merge the output into ~/.claude/settings.json. It contains two top-level keys:
+"hooks" for the mood events, and "statusLine" for the usage gauge -- the
+five-hour limit percentage and reset time exist only in the status line's JSON,
+not in any hook payload.
 
 Two things about the generated config are load-bearing:
 
@@ -28,6 +31,8 @@ Two things about the generated config are load-bearing:
 """
 
 import json
+import os
+import shlex
 import sys
 
 # Claude Code hook -> matcher -> the raw fact the board is told about.
@@ -107,7 +112,20 @@ def main() -> int:
             {"matcher": matcher, "hooks": [entry(host, token, event)]}
         )
 
-    print(json.dumps({"hooks": hooks}, indent=2))
+    # The status line is the only place Claude Code exposes rate-limit figures,
+    # so the usage gauge depends on it. refreshInterval keeps the countdown
+    # moving while you are idle, when no assistant message would trigger it.
+    # statusLine takes a shell string, not an argv array, so the path has to be
+    # quoted -- this project's own directory has spaces in it.
+    here = os.path.dirname(os.path.abspath(__file__))
+    script = shlex.quote(os.path.join(here, "statusline.py"))
+    statusline = {
+        "type": "command",
+        "command": f"python3 {script} {shlex.quote(host)} {shlex.quote(token)}",
+        "refreshInterval": 60,
+    }
+
+    print(json.dumps({"hooks": hooks, "statusLine": statusline}, indent=2))
     return 0
 
 

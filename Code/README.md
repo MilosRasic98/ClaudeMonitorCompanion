@@ -158,28 +158,40 @@ style, as before. If your panel reports its axes the other way round, flip
 | Screen | What it shows |
 |---|---|
 | **Face** | the mascot. The resting screen, and what the shell is built around |
-| **Gauge** | how far through the usage window you are, and the wall-clock time it resets |
+| **Gauge** | a ring showing how much of the five-hour limit is used, with time to reset below |
 | **Stats** | IP, signal, uptime, mood, energy, prompts this window, current time |
 
-### What the gauge does and does not know
+### Where the gauge's numbers come from
 
-It measures **time**, not consumption, and the screen says so.
+The ring shows the real percentage of your five-hour limit, and the line beneath it the real
+time to reset. Both come from Claude Code's **status line**, which is the only place it
+exposes them:
 
-No Claude Code hook reports how much of your quota you have used. The only limit-related
-signal is `StopFailure` with `error: rate_limit`, and that arrives once you have already hit
-the wall. What *is* derivable is the window itself: it opens with your first message and runs
-a fixed number of hours, so from the `prompt_submitted` events the board already receives it
-knows when the window opened and therefore when it resets.
+```
+rate_limits.five_hour.used_percentage    0-100
+rate_limits.five_hour.resets_at          unix epoch seconds
+```
 
-So the gauge shows time remaining and the reset clock, both exact. It does not pretend to
-show a percentage it cannot compute.
+**No hook carries this.** The only limit-related hook is `StopFailure` with
+`error: rate_limit`, and that fires once you have already hit the wall. So
+[tools/statusline.py](tools/statusline.py) reads the status line JSON, forwards those two
+numbers to `POST /limits`, and prints an ordinary status line. `gen_hooks.py` emits its
+config alongside the hooks.
 
-Two caveats:
+Two details in that script are load-bearing. The POST is **spawned detached and never waited
+on**, because Claude Code cancels an in-flight status line script when a new update arrives —
+a blocking call would be killed part-way, and would stall the status bar whenever the board
+was off. And the status line **prints regardless** of whether forwarding worked: a desk
+ornament must never be able to break the editor it decorates.
 
-- The board only sees prompts while it is powered and connected. Work done with it off does
-  not move the window, so after an outage the reset time can read early.
-- Wall-clock time comes from NTP, applied through the POSIX timezone string in settings.
-  Until the first sync the gauge reads `NO CLOCK` rather than guessing.
+Without the status line configured, the gauge falls back to timing the window from the
+prompts the board has seen and labels itself `EST - NO HOST`. That fallback is only ever a
+lower bound — it cannot know about work done before the board was switched on, so it reads
+the window as opening later than it really did. This is why the fallback is labelled rather
+than dressed up as a quota.
+
+Wall-clock time comes from NTP through the POSIX timezone string in settings. Until the first
+sync the gauge reads `NO CLOCK` rather than guessing.
 
 Text is drawn with a 3x5 pixel font scaled by whole numbers, so glyph edges land on the same
 grid as the face.
