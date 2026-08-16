@@ -20,7 +20,9 @@
 #include "net.h"
 #include "pins.h"
 #include "touch.h"
+#include "usage.h"
 #include "tuning.h"
+#include "views.h"
 
 namespace {
 
@@ -68,10 +70,20 @@ void service_touch() {
       // Whichever axis dominates wins. The raw-to-panel orientation is still
       // unconfirmed, so keying off the dominant axis rather than X alone means
       // a horizontal flick works even if the driver's axes turn out swapped.
-      const int travel = (adx >= ady) ? dx : dy;
+      // Sideways changes the face, up-down changes the screen. If the touch
+      // controller's axes turn out swapped on a given panel, one setting flips
+      // the interpretation rather than needing a rebuild.
+      bool horizontal = adx >= ady;
+      if (config::v::swipe_swap_axes()) horizontal = !horizontal;
+      const int travel = horizontal ? dx : dy;
       const int dir = (travel > 0) ? 1 : -1;
-      face::cycle_style(SWIPE_INVERT ? -dir : dir);
-      Serial.printf("swipe dx %d dy %d\n", dx, dy);
+      if (horizontal) {
+        face::cycle_style(SWIPE_INVERT ? -dir : dir);
+      } else {
+        views::cycle(dir);
+      }
+      Serial.printf("swipe dx %d dy %d -> %s\n", dx, dy,
+                    horizontal ? "style" : "view");
       s_drag.fired = true;
       continue;
     }
@@ -123,7 +135,17 @@ void render_task(void *) {
     const uint32_t t0 = micros();
 
     mood::tick(now);
-    face::render(mood::current(), mood::energy(), now);
+
+    // The data screens own the whole panel when they are up. Coming back to the
+    // face needs an explicit repaint, since its dirty tracking has no idea
+    // something else drew over it.
+    static views::View last_view = views::View::Face;
+    const bool handled = views::render(now, face::background());
+    if (views::current() != last_view) {
+      last_view = views::current();
+      if (last_view == views::View::Face) face::refresh();
+    }
+    if (!handled) face::render(mood::current(), mood::energy(), now);
 
     if (mood::take_bell()) bell::strike();
     if (mood::take_celebration()) bell::celebrate();
@@ -170,10 +192,10 @@ void service_demo() {
 void print_help() {
   Serial.println("events : p prompt | f turn finished | n needs input");
   Serial.println("         e error  | i idle          | s session start");
-  Serial.println("         x session end | a ack (touch) | v answered");
+  Serial.println("         x session end | a ack (touch) | k answered");
   Serial.println("moods  : 1 chill 2 working 3 excited 4 confused 5 angry");
   Serial.println("         6 limit 7 bored 8 sleeping 9 waking | d auto-cycle");
-  Serial.println("faces  : [ ] cycle style (or swipe the screen)");
+  Serial.println("views  : [ ] style (swipe sideways) | v next screen (swipe up)");
   Serial.println("tuning : c orange | b bell | z buzz | w scan | r reach | h health | ?");
 }
 
@@ -187,7 +209,7 @@ void handle_command(char c) {
     case 's': mood::post(mood::Event::SessionStarted);  break;
     case 'x': mood::post(mood::Event::SessionEnded);    break;
     case 'a': mood::post(mood::Event::Ack);             break;
-    case 'v': mood::post(mood::Event::Answered);        break;
+    case 'k': mood::post(mood::Event::Answered);        break;
     case '1': case '2': case '3': case '4': case '5': case '6': case '7':
     case '8': case '9': {
       const mood::Mood m = kAllMoods[c - '1'];
@@ -209,6 +231,9 @@ void handle_command(char c) {
       face::cycle_style(c == ']' ? +1 : -1);
       Serial.printf("style -> %s\n", face::style_name());
       return;
+    // Not printing the name: the change is applied by the render task, so
+    // reading it here would report the previous view.
+    case 'v': views::cycle(1); Serial.println("next view"); return;
     case 'w': net::scan(); return;
     case 'r': net::probe(); return;
     case 'b': bell::strike(); return;
@@ -255,6 +280,8 @@ void setup() {
     while (true) delay(1000);
   }
 
+  usage::begin();
+  views::begin();
   face::begin();
   mood::begin(millis());
   bell::begin();
@@ -285,6 +312,7 @@ void loop() {
   service_demo();
   bell::tick();
   net::tick();
+  usage::tick(net::connected());
   // 5 ms, not 20: this is the swipe sampling rate, and a flick that only gets
   // sampled three times does not read as a flick.
   delay(5);

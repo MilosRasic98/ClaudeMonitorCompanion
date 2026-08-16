@@ -5,6 +5,7 @@
 #include <freertos/queue.h>
 
 #include "config.h"
+#include "usage.h"
 #include "tuning.h"
 
 namespace mood {
@@ -54,6 +55,7 @@ void apply(Event e, uint32_t now) {
   switch (e) {
     case Event::PromptSubmitted:
       if (s_mood == Mood::Limit) s_sticky = false;  // work resumed
+      usage::note_prompt();
       bump_energy(ENERGY_BUMP_PROMPT);
       s_last_prompt = now;
       s_turn_running = true;

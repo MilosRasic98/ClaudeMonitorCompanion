@@ -9,6 +9,8 @@
 #include "config.h"
 #include "face.h"
 #include "mood.h"
+#include "usage.h"
+#include "views.h"
 #include "secrets.h"
 #include "tuning.h"
 
@@ -163,6 +165,11 @@ String config_json() {
     j += "\""; j += mood::name((mood::Mood)m); j += "\"";
   }
   j += "],";
+  j += "\"view\":\""; j += views::name(); j += "\",";
+  j += "\"clock_ok\":"; j += usage::clock_valid() ? "true" : "false"; j += ",";
+  j += "\"window_remaining_s\":"; j += usage::remaining_s(); j += ",";
+  j += "\"window_reset\":"; j += (uint32_t)usage::window_reset_at(); j += ",";
+  j += "\"prompts\":"; j += usage::prompts(); j += ",";
   j += "\"ap_mode\":"; j += config::ap_mode() ? "true" : "false"; j += ",";
   j += "\"version\":\"1.0\"}";
 

@@ -149,6 +149,41 @@ host in the loop.
 
 Forcing moods matters because `BORED` is five minutes away and `SLEEPING` is thirty.
 
+## Screens
+
+**Swipe up or down** to move between three screens. **Swipe sideways** to change the face's
+style, as before. If your panel reports its axes the other way round, flip
+`Swap swipe axes` on the settings page rather than rebuilding.
+
+| Screen | What it shows |
+|---|---|
+| **Face** | the mascot. The resting screen, and what the shell is built around |
+| **Gauge** | how far through the usage window you are, and the wall-clock time it resets |
+| **Stats** | IP, signal, uptime, mood, energy, prompts this window, current time |
+
+### What the gauge does and does not know
+
+It measures **time**, not consumption, and the screen says so.
+
+No Claude Code hook reports how much of your quota you have used. The only limit-related
+signal is `StopFailure` with `error: rate_limit`, and that arrives once you have already hit
+the wall. What *is* derivable is the window itself: it opens with your first message and runs
+a fixed number of hours, so from the `prompt_submitted` events the board already receives it
+knows when the window opened and therefore when it resets.
+
+So the gauge shows time remaining and the reset clock, both exact. It does not pretend to
+show a percentage it cannot compute.
+
+Two caveats:
+
+- The board only sees prompts while it is powered and connected. Work done with it off does
+  not move the window, so after an outage the reset time can read early.
+- Wall-clock time comes from NTP, applied through the POSIX timezone string in settings.
+  Until the first sync the gauge reads `NO CLOCK` rather than guessing.
+
+Text is drawn with a 3x5 pixel font scaled by whole numbers, so glyph edges land on the same
+grid as the face.
+
 ## Faces
 
 The printed mascot exists in several faces, so the firmware does too. **Swipe across the

@@ -90,6 +90,8 @@ int alert_max_s();
 int angry_s();
 int poke_count();
 int poke_window_s();
+int window_hours();
+bool swipe_swap_axes();
 
 int backlight_sleeping();
 int backlight_bored();

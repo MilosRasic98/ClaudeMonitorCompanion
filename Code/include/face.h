@@ -33,6 +33,10 @@ uint8_t orange_index();
 // reboot — it is a preference, not a setting you want to re-pick every power
 // cycle.
 void cycle_style(int delta);
+
+// The current field colour — orange normally, red while the mascot wants
+// something. The other screens share it so the whole device reads as one thing.
+uint16_t background();
 Style style();
 const char *style_name();
 

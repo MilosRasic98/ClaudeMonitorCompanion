@@ -33,6 +33,7 @@ const Field kFields[] = {
     {"Face",   "eye_center_y",       "Eye height on screen",   Type::Int,    40,   240, EYE_CENTER_Y,           "Lower number sits higher up", nullptr, nullptr},
     {"Face",   "grid_q",             "Pixel size",             Type::Int,     1,    20, GRID_Q,                 "Everything snaps to this. Bigger is chunkier and jerkier", nullptr, nullptr},
     {"Face",   "blink_min_ms",       "Fastest blink gap (ms)", Type::Int,   200, 20000, BLINK_MIN_GAP_MS,       nullptr, nullptr, nullptr},
+    {"Face",   "swipe_swap_axes",    "Swap swipe axes",        Type::Bool,    0,     1, 0,                      "If sideways swipes change the view instead of the face, turn this on", nullptr, nullptr},
     {"Face",   "blink_max_ms",       "Slowest blink gap (ms)", Type::Int,   200, 30000, BLINK_MAX_GAP_MS,       nullptr, nullptr, nullptr},
 
     {"Timing", "bored_after_min",    "Bored after (minutes)",  Type::Int,     1,   240, 5,                      "Since your last prompt", nullptr, nullptr},
@@ -41,6 +42,7 @@ const Field kFields[] = {
     {"Timing", "angry_s",            "Sulk length (seconds)",  Type::Int,     1,    60, 7,                      nullptr, nullptr, nullptr},
     {"Timing", "alert_max_s",        "Alert gives up after (s)",Type::Int,   10,  1800, 180,                    "Safety net so it can never stay red forever", nullptr, nullptr},
     {"Timing", "poke_count",         "Pokes before annoyed",   Type::Int,     2,    20, POKE_ANGRY_COUNT,       nullptr, nullptr, nullptr},
+    {"Timing", "window_hours",       "Usage window (hours)",   Type::Int,     1,    24, 5,                      "Anthropic's rolling limit window", nullptr, nullptr},
     {"Timing", "poke_window_s",      "Poke window (seconds)",  Type::Int,     1,    30, 4,                      nullptr, nullptr, nullptr},
 
     {"Screen", "bl_sleeping",        "Brightness asleep",      Type::Int,     0,   255, BACKLIGHT_SLEEPING,     nullptr, nullptr, nullptr},
@@ -51,6 +53,7 @@ const Field kFields[] = {
     {"Wi-Fi",  "wifi_ssid",          "Wi-Fi network",          Type::Text,     0,    32, 0,                      "2.4 GHz only - the ESP32 has no 5 GHz radio", nullptr, WIFI_SSID},
     {"Wi-Fi",  "wifi_pass",          "Wi-Fi password",         Type::Password, 0,    63, 0,                      "Leave blank to keep the current one", nullptr, WIFI_PASS},
     {"Wi-Fi",  "mdns_name",          "Hostname",               Type::Text,     0,    24, 0,                      "Reachable as <name>.local on macOS", nullptr, MDNS_NAME},
+    {"Wi-Fi",  "tz",                 "Timezone",               Type::Text,     0,    48, 0,                      "POSIX TZ string, e.g. CET-1CEST,M3.5.0,M10.5.0/3", nullptr, "CET-1CEST,M3.5.0,M10.5.0/3"},
     {"Wi-Fi",  "token",              "Hook token",             Type::Password, 0,    48, 0,                      "The bearer token your Claude Code hooks send", nullptr, NOTIFY_TOKEN},
 };
 
@@ -206,6 +209,8 @@ int alert_max_s()          { return get("alert_max_s"); }
 int angry_s()              { return get("angry_s"); }
 int poke_count()           { return get("poke_count"); }
 int poke_window_s()        { return get("poke_window_s"); }
+int window_hours()         { return get("window_hours"); }
+bool swipe_swap_axes()     { return get("swipe_swap_axes") != 0; }
 
 int backlight_sleeping()   { return get("bl_sleeping"); }
 int backlight_bored()      { return get("bl_bored"); }

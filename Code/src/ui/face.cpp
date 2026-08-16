@@ -520,6 +520,8 @@ void cycle_style(int delta) {
   s_want_style_delta = (int8_t)(s_want_style_delta + delta);
 }
 
+uint16_t background() { return mood::alerting() ? kRed : s_orange; }
+
 Style style() { return s_style; }
 const char *style_name() { return style_info(s_style).name; }
 
