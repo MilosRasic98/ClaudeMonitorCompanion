@@ -1,0 +1,8 @@
+.DS_Store
+Thumbs.db
+
+# PlatformIO build output
+Code/.pio/
+
+# Local credentials — see Code/include/secrets.h.example
+Code/include/secrets.h
