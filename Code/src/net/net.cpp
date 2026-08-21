@@ -565,6 +565,37 @@ void scan() {
   s_next_retry = millis() + s_backoff_ms;
 }
 
+void wifi_diag() {
+  const char *ssid = config::get_str("wifi_ssid");
+  const char *pass = config::get_str("wifi_pass");
+  // Never print the password. A length and a digest are enough to compare it
+  // against what you believe it should be.
+  uint32_t h = 2166136261u;
+  for (const char *c = pass; *c; c++) h = (h ^ (uint8_t)*c) * 16777619u;
+  Serial.printf("wifi  : stored ssid \"%s\" (%u chars)\n", ssid, (unsigned)strlen(ssid));
+  Serial.printf("wifi  : stored pass %u chars, digest %08x\n",
+                (unsigned)strlen(pass), h);
+
+  uint32_t hc = 2166136261u;
+  for (const char *c = WIFI_PASS; *c; c++) hc = (hc ^ (uint8_t)*c) * 16777619u;
+  Serial.printf("wifi  : compiled  \"%s\" pass %u chars, digest %08x\n",
+                WIFI_SSID, (unsigned)strlen(WIFI_PASS), hc);
+  Serial.printf("wifi  : stored matches compiled: %s\n",
+                (h == hc && strcmp(ssid, WIFI_SSID) == 0) ? "yes" : "NO");
+  Serial.printf("wifi  : ap fallback active: %s\n",
+                config::ap_mode() ? "yes" : "no");
+}
+
+void wifi_restore_defaults() {
+  config::set_str("wifi_ssid", WIFI_SSID);
+  // set_str treats an empty password as "unchanged", so write it directly.
+  config::set_str("wifi_pass", WIFI_PASS);
+  Serial.printf("wifi  : restored compiled credentials for \"%s\", reconnecting\n",
+                WIFI_SSID);
+  WiFi.disconnect();
+  connect_bound();
+}
+
 void probe() {
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("probe : wifi down");

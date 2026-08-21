@@ -73,6 +73,14 @@ int piezo_gap_ms();
 int piezo_repeat_gap_ms();
 
 int bell_pin();
+int bell_switch_pin();
+bool bell_switch_invert();
+int bell_mode();        // 0 stop on time, 1 stop after N rings
+int bell_spin_ms();
+int bell_rings();
+int bell_max_ms();
+int servo_run_us();
+int servo_stop_us();
 
 int style();
 int orange();

@@ -23,6 +23,16 @@ const char *ip();
 // explanation for a failure to associate.
 void scan();
 
+// Print what credentials are actually stored, without printing the password
+// itself: SSID plus the password's length and a short digest. Enough to tell
+// "this is not the password I think it is" from "the AP is refusing me".
+void wifi_diag();
+
+// Put the compiled-in credentials from secrets.h back. The recovery path when
+// the stored ones have been changed to something that does not work and the
+// device is sealed in a case.
+void wifi_restore_defaults();
+
 // Outbound TCP probe from the board: the gateway, then PROBE_HOST. If outbound
 // works while inbound does not, the AP is isolating its clients.
 void probe();

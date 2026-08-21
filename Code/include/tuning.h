@@ -173,14 +173,6 @@ static const uint16_t kRed = COLOR(0xC8, 0x14, 0x10);
 #define ANGRY_DROP  40  // total vertical fall across the eye width
 #define ANGRY_THICK 20
 
-// ------------------------------------------------------------------- bell --
-// Placeholders. A solenoid or striker needs enough current to actually move,
-// and a duty that does not simply cook the coil — these get tuned against the
-// real actuator, not guessed here.
-#define BELL_PWM_HZ       200
-#define BELL_STRIKE_DUTY  200  // of 255
-#define BELL_STRIKE_MS    40   // pulse length; released by bell::tick()
-
 // Celebration on the onboard piezo when a turn finishes. Two rising chirps.
 // Safe despite the "hold the piezo low" rule: the danger is the pin idling high
 // or floating, and this drives PWM for a fifth of a second then puts it back
@@ -203,6 +195,21 @@ static const uint16_t kRed = COLOR(0xC8, 0x14, 0x10);
 #define PIEZO_REPEATS       2
 #define PIEZO_REPEAT_GAP_MS 130  // longer than the inner gap, so the two read
                                  // as separate buzzes rather than four beeps
+
+// ------------------------------------------------------------------- bell --
+// A continuous-rotation servo striking a bell. Such a servo takes an ordinary
+// 50 Hz servo signal but reads it as speed rather than position: the neutral
+// pulse means stop, and moving away from neutral in either direction means run,
+// faster the further you go. So there are only two commands to send.
+#define SERVO_HZ        50
+#define SERVO_PERIOD_US 20000
+#define SERVO_RUN_US    2500  // full speed; 500 runs the other way
+#define SERVO_STOP_US   1500  // neutral
+
+#define BELL_SPIN_MS    600   // timed mode: how long to run
+#define BELL_RINGS      2     // counted mode: how many strikes
+#define BELL_MAX_MS     6000  // safety cap, so a stuck switch cannot run forever
+#define BELL_DEBOUNCE_MS 15
 
 // --------------------------------------------------------------- backlight --
 #define BACKLIGHT_SLEEPING 40

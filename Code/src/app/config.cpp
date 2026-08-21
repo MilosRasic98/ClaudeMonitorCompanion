@@ -20,11 +20,19 @@ const Field kFields[] = {
     {"Sound",  "piezo_duty",         "Volume",                 Type::Int,     0,   255, PIEZO_DUTY,             "Loudest near 128", nullptr, nullptr},
     {"Sound",  "piezo_gap_ms",       "Gap inside a buzz (ms)", Type::Int,     0,   500, PIEZO_GAP_MS,           nullptr, nullptr, nullptr},
     {"Sound",  "piezo_rep_gap_ms",   "Gap between buzzes (ms)",Type::Int,     0,  1000, PIEZO_REPEAT_GAP_MS,    "Wider than the inner gap, or it reads as four beeps", nullptr, nullptr},
+    {"Sound",  "bell_pin",           "Servo signal GPIO",      Type::Int,    -1,    48, -1,                     "-1 disables the bell. Free pins: 17, 18, 21, 38, 47, 48", nullptr, nullptr},
+    {"Sound",  "bell_switch_pin",    "Ring sensor GPIO",       Type::Int,    -1,    48, -1,                     "Microswitch the striker closes once per ring. -1 to count time instead", nullptr, nullptr},
+    {"Sound",  "bell_switch_invert", "Sensor reads inverted",  Type::Bool,    0,     1, 0,                      "Turn on if the switch idles low rather than high", nullptr, nullptr},
+    {"Sound",  "bell_mode",          "Bell stops after",       Type::Enum,    0,     1, 0,                      nullptr, "a set time,a number of rings", nullptr},
+    {"Sound",  "bell_spin_ms",       "Spin time (ms)",         Type::Int,    50,  5000, BELL_SPIN_MS,           "Used when stopping on time", nullptr, nullptr},
+    {"Sound",  "bell_rings",         "Rings",                  Type::Int,     1,    20, BELL_RINGS,             "Used when stopping on the sensor", nullptr, nullptr},
+    {"Sound",  "bell_max_ms",        "Give up after (ms)",     Type::Int,   200, 20000, BELL_MAX_MS,            "Safety cap, so a stuck sensor cannot leave the servo running", nullptr, nullptr},
+    {"Sound",  "servo_run_us",       "Servo run pulse (us)",   Type::Int,   500,  2500, SERVO_RUN_US,           "2500 or 500 for full speed either way", nullptr, nullptr},
+    {"Sound",  "servo_stop_us",      "Servo stop pulse (us)",  Type::Int,   500,  2500, SERVO_STOP_US,          "Neutral. Trim it if the servo creeps when idle", nullptr, nullptr},
     {"Sound",  "alert_sound",        "Sound when blocked",     Type::Enum,    0,     3, 3,                      "Needs input, angry, or the usage limit", "none,bell,buzzer,both", nullptr},
     {"Sound",  "error_sound",        "Sound on errors",        Type::Enum,    0,     3, 2,                      nullptr, "none,bell,buzzer,both", nullptr},
     {"Sound",  "done_sound",         "Sound when finished",    Type::Enum,    0,     3, 2,                      "The short double buzz", "none,bell,buzzer,both", nullptr},
     {"Sound",  "piezo_long_ms",      "Long buzz length (ms)",  Type::Int,   100,  3000, PIEZO_LONG_MS,          "The buzzer's bad-news sound", nullptr, nullptr},
-    {"Sound",  "bell_pin",           "Bell striker GPIO",      Type::Int,    -1,    48, -1,                     "-1 disables. Free pins: 17, 18, 21, 38, 47, 48", nullptr, nullptr},
 
     {"Face",   "style",              "Face style",             Type::Enum,    0,     8, 0,                      "Also changed by swiping the screen", "plain,grin,round,pixel,shades,custom1,custom2,custom3,custom4", nullptr},
     {"Face",   "orange",             "Background shade",       Type::Enum,    0,     3, ORANGE_DEFAULT,         "Match it to your printed shell by eye", "saturated,bright,deep,amber", nullptr},
@@ -220,6 +228,14 @@ int piezo_gap_ms()         { return get("piezo_gap_ms"); }
 int piezo_repeat_gap_ms()  { return get("piezo_rep_gap_ms"); }
 
 int bell_pin()             { return get("bell_pin"); }
+int bell_switch_pin()      { return get("bell_switch_pin"); }
+bool bell_switch_invert()  { return get("bell_switch_invert") != 0; }
+int bell_mode()            { return get("bell_mode"); }
+int bell_spin_ms()         { return get("bell_spin_ms"); }
+int bell_rings()           { return get("bell_rings"); }
+int bell_max_ms()          { return get("bell_max_ms"); }
+int servo_run_us()         { return get("servo_run_us"); }
+int servo_stop_us()        { return get("servo_stop_us"); }
 
 int style()                { return get("style"); }
 int orange()               { return get("orange"); }

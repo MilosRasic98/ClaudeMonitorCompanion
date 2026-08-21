@@ -23,8 +23,97 @@ const ledc_timer_t kPiezoTimer = LEDC_TIMER_2;
 const ledc_channel_t kPiezoChannel = LEDC_CHANNEL_2;
 
 bool s_wired = false;
-int s_pin = -1;  // resolved from config at begin()/reconfigure()
-uint32_t s_release_at = 0;
+bool s_attached = false;  // is LEDC currently driving the servo pin
+int s_pin = -1;         // servo signal, resolved from config
+int s_switch_pin = -1;  // ring sensor, -1 when stopping on time
+uint32_t s_stop_at = 0; // hard deadline, always set
+bool s_running = false;
+
+// Ring counting. The striker closes the switch once per pass: the pin leaves
+// idle as it swings through and returns as it clears, so a ring is the return.
+// Counting the return rather than the departure means a striker that stops
+// resting against the switch cannot inflate the count.
+int s_rings_wanted = 0;
+int s_rings_seen = 0;
+bool s_left_idle = false;
+int s_last_level = -1;
+uint32_t s_last_edge_ms = 0;
+
+// The ESP32-S3's LEDC tops out at 14-bit duty resolution -- unlike the original
+// ESP32, which does 20. At 50 Hz that is 1.2 us per step, still far finer than
+// any servo resolves.
+const int kServoBits = 14;
+
+uint32_t us_to_duty(int us) {
+  if (us < 0) us = 0;
+  if (us > SERVO_PERIOD_US) us = SERVO_PERIOD_US;
+  return (uint32_t)((uint64_t)us * ((1u << kServoBits) - 1) / SERVO_PERIOD_US);
+}
+
+void servo_write_us(int us) {
+  ledc_set_duty(LEDC_LOW_SPEED_MODE, kBellChannel, us_to_duty(us));
+  ledc_update_duty(LEDC_LOW_SPEED_MODE, kBellChannel);
+}
+
+bool switch_idle() {
+  if (s_switch_pin < 0) return true;
+  const int lvl = digitalRead(s_switch_pin);
+  return config::v::bell_switch_invert() ? (lvl == LOW) : (lvl == HIGH);
+}
+
+// Release the servo rather than hold it at neutral.
+//
+// A continuous-rotation servo does not move without a signal, so cutting the
+// PWM and parking the pin low is a complete stop that draws nothing. Holding it
+// at a neutral pulse instead means it keeps drawing, and if the neutral trim is
+// even slightly off it creeps forever -- current for no reason, in a sealed
+// case, right next to the antenna.
+void servo_release() {
+  if (s_attached) {
+    ledc_stop(LEDC_LOW_SPEED_MODE, kBellChannel, 0);
+    s_attached = false;
+  }
+  if (s_pin >= 0) {
+    pinMode(s_pin, OUTPUT);
+    digitalWrite(s_pin, LOW);
+  }
+  s_running = false;
+}
+
+// Attach on demand rather than at boot. Nothing drives the pin until the first
+// strike, so start-up -- including joining the network -- happens with the
+// servo completely inert.
+bool servo_attach() {
+  if (s_attached) return true;
+  if (s_pin < 0) return false;
+
+  ledc_timer_config_t t = {};
+  t.speed_mode = LEDC_LOW_SPEED_MODE;
+  t.duty_resolution = (ledc_timer_bit_t)kServoBits;
+  t.timer_num = kBellTimer;
+  t.freq_hz = SERVO_HZ;
+  t.clk_cfg = LEDC_AUTO_CLK;
+  if (ledc_timer_config(&t) != ESP_OK) {
+    log_e("bell: servo timer rejected; bell disabled");
+    return false;
+  }
+
+  ledc_channel_config_t c = {};
+  c.gpio_num = s_pin;
+  c.speed_mode = LEDC_LOW_SPEED_MODE;
+  c.channel = kBellChannel;
+  c.timer_sel = kBellTimer;
+  c.duty = 0;
+  c.hpoint = 0;
+  if (ledc_channel_config(&c) != ESP_OK) {
+    log_e("bell: servo pin %d rejected; bell disabled", s_pin);
+    return false;
+  }
+  s_attached = true;
+  return true;
+}
+
+void servo_stop() { servo_release(); }
 
 // Celebration sequence. A zero frequency means silence for that step.
 struct Chirp { uint16_t hz; uint16_t ms; };
@@ -81,7 +170,10 @@ void begin() {
   pt.timer_num = kPiezoTimer;
   pt.freq_hz = PIEZO_BEEP1_HZ;
   pt.clk_cfg = LEDC_AUTO_CLK;
-  ESP_ERROR_CHECK(ledc_timer_config(&pt));
+  if (ledc_timer_config(&pt) != ESP_OK) {
+    log_e("bell: piezo timer rejected; buzzer disabled");
+    return;
+  }
 
   ledc_channel_config_t pc = {};
   pc.gpio_num = PIN_BUZZER;
@@ -90,30 +182,28 @@ void begin() {
   pc.timer_sel = kPiezoTimer;
   pc.duty = 0;
   pc.hpoint = 0;
-  ESP_ERROR_CHECK(ledc_channel_config(&pc));
+  if (ledc_channel_config(&pc) != ESP_OK) {
+    log_e("bell: piezo channel rejected; buzzer disabled");
+    return;
+  }
   piezo_silence();
 #endif
 
   s_pin = config::v::bell_pin();
+  s_switch_pin = config::v::bell_switch_pin();
   s_wired = false;
-  if (s_pin >= 0) {
-  ledc_timer_config_t t = {};
-  t.speed_mode = LEDC_LOW_SPEED_MODE;
-  t.duty_resolution = LEDC_TIMER_8_BIT;
-  t.timer_num = kBellTimer;
-  t.freq_hz = BELL_PWM_HZ;
-  t.clk_cfg = LEDC_AUTO_CLK;
-  ESP_ERROR_CHECK(ledc_timer_config(&t));
 
-  ledc_channel_config_t c = {};
-  c.gpio_num = s_pin;
-  c.speed_mode = LEDC_LOW_SPEED_MODE;
-  c.channel = kBellChannel;
-  c.timer_sel = kBellTimer;
-  c.duty = 0;
-  c.hpoint = 0;
-  ESP_ERROR_CHECK(ledc_channel_config(&c));
-  s_wired = true;
+  if (s_switch_pin >= 0) {
+    // Pull-up, so an unconnected sensor reads idle and the bell falls back to
+    // its deadline rather than never stopping.
+    pinMode(s_switch_pin, INPUT_PULLUP);
+  }
+
+  if (s_pin >= 0) {
+    // No PWM yet. The servo is attached on the first strike and released
+    // afterwards, so it is inert through boot and through joining the network.
+    s_wired = true;
+    servo_release();
   }
 }
 
@@ -121,24 +211,41 @@ void begin() {
 // the old pin first matters: leaving a coil driver attached to a pin we no
 // longer manage is how you get a permanently energised solenoid.
 void reconfigure() {
-  if (config::v::bell_pin() == s_pin) return;
+  if (config::v::bell_pin() == s_pin &&
+      config::v::bell_switch_pin() == s_switch_pin) {
+    return;
+  }
   if (s_wired) {
-    ledc_set_duty(LEDC_LOW_SPEED_MODE, kBellChannel, 0);
-    ledc_update_duty(LEDC_LOW_SPEED_MODE, kBellChannel);
-    ledc_stop(LEDC_LOW_SPEED_MODE, kBellChannel, 0);
-    pinMode(s_pin, INPUT);
+    servo_release();
+    pinMode(s_pin, INPUT);  // never leave a driver attached to a pin we dropped
   }
   begin();
 }
 
 void strike() {
   if (!s_wired) {
-    Serial.println("[bell] (no GPIO set — pick one on the settings page)");
+    Serial.println("[bell] (no servo GPIO set - pick one on the settings page)");
     return;
   }
-  ledc_set_duty(LEDC_LOW_SPEED_MODE, kBellChannel, BELL_STRIKE_DUTY);
-  ledc_update_duty(LEDC_LOW_SPEED_MODE, kBellChannel);
-  s_release_at = millis() + BELL_STRIKE_MS;
+  if (!servo_attach()) {
+    Serial.println("[bell] servo would not attach");
+    return;
+  }
+  const uint32_t now = millis();
+  const bool by_rings = config::v::bell_mode() == 1 && s_switch_pin >= 0;
+
+  s_rings_wanted = by_rings ? config::v::bell_rings() : 0;
+  s_rings_seen = 0;
+  s_left_idle = false;
+  s_last_level = switch_idle() ? 1 : 0;
+  s_last_edge_ms = now;
+
+  // The deadline applies in both modes. In timed mode it is the stop; in ring
+  // mode it is the backstop for a sensor that never reports.
+  s_stop_at = now + (uint32_t)(by_rings ? config::v::bell_max_ms()
+                                        : config::v::bell_spin_ms());
+  s_running = true;
+  servo_write_us(config::v::servo_run_us());
 }
 
 void celebrate() {
@@ -179,12 +286,28 @@ void play(mood::Cue cue) {
 void tick() {
   const uint32_t now = millis();
 
-  if (s_release_at && now >= s_release_at) {
-    s_release_at = 0;
-    if (s_wired) {
-      // Releasing matters more than striking: a coil left energised is a heater.
-      ledc_set_duty(LEDC_LOW_SPEED_MODE, kBellChannel, 0);
-      ledc_update_duty(LEDC_LOW_SPEED_MODE, kBellChannel);
+  if (s_running) {
+    if (s_rings_wanted > 0) {
+      const int lvl = switch_idle() ? 1 : 0;
+      if (lvl != s_last_level && now - s_last_edge_ms >= BELL_DEBOUNCE_MS) {
+        s_last_edge_ms = now;
+        s_last_level = lvl;
+        if (lvl == 0) {
+          s_left_idle = true;          // striker on its way through
+        } else if (s_left_idle) {
+          s_left_idle = false;
+          if (++s_rings_seen >= s_rings_wanted) servo_stop();
+        }
+      }
+    }
+    // Stopping matters more than starting: a continuous-rotation servo left
+    // running does not stop on its own.
+    if (s_running && now >= s_stop_at) {
+      if (s_rings_wanted > 0 && s_rings_seen < s_rings_wanted) {
+        Serial.printf("[bell] gave up after %d of %d rings\n", s_rings_seen,
+                      s_rings_wanted);
+      }
+      servo_stop();
     }
   }
 

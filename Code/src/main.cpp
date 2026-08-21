@@ -196,7 +196,57 @@ void print_help() {
   Serial.println("moods  : 1 chill 2 working 3 excited 4 confused 5 angry");
   Serial.println("         6 limit 7 bored 8 sleeping 9 waking | d auto-cycle");
   Serial.println("views  : [ ] style (swipe sideways) | v next screen (swipe up)");
-  Serial.println("tuning : c orange | b bell | z buzz | l long | w scan | r reach | h ?");
+  Serial.println("tuning : c orange | b bell | z buzz | l long | w scan | r reach | h ?\n"
+                 "wifi   : W show stored creds (lengths only) | R restore compiled creds");
+}
+
+// A line-oriented escape hatch: "set <key> <value>" reaches any setting over
+// USB. The web page is the normal way in, but a device sealed in a case that
+// cannot join a network cannot be reached that way -- which is exactly when you
+// most need to change something.
+void handle_line(const String &line) {
+  if (!line.startsWith("set ")) {
+    Serial.println("usage: set <key> <value>   (try 'get' to list)");
+    return;
+  }
+  const int sp = line.indexOf(' ', 4);
+  if (sp < 0) {
+    Serial.println("usage: set <key> <value>");
+    return;
+  }
+  const String key = line.substring(4, sp);
+  const String val = line.substring(sp + 1);
+
+  const config::Field *f = config::fields();
+  for (size_t i = 0; i < config::field_count(); i++) {
+    if (key != f[i].key) continue;
+    bool ok;
+    if (f[i].type == config::Type::Text || f[i].type == config::Type::Password) {
+      ok = config::set_str(f[i].key, val.c_str());
+    } else {
+      ok = config::set(f[i].key, val.toInt());
+    }
+    Serial.printf("%s %s = %s\n", ok ? "set" : "REJECTED", f[i].key, val.c_str());
+    if (ok) {
+      face::refresh();
+      bell::reconfigure();
+    }
+    return;
+  }
+  Serial.printf("no such setting: %s\n", key.c_str());
+}
+
+void list_settings() {
+  const config::Field *f = config::fields();
+  for (size_t i = 0; i < config::field_count(); i++) {
+    if (f[i].type == config::Type::Password) {
+      Serial.printf("  %-20s (hidden)\n", f[i].key);
+    } else if (f[i].type == config::Type::Text) {
+      Serial.printf("  %-20s %s\n", f[i].key, config::get_str(f[i].key));
+    } else {
+      Serial.printf("  %-20s %d\n", f[i].key, (int)config::get(f[i].key));
+    }
+  }
 }
 
 void handle_command(char c) {
@@ -233,6 +283,8 @@ void handle_command(char c) {
     // Not printing the name: the change is applied by the render task, so
     // reading it here would report the previous view.
     case 'v': views::cycle(1); Serial.println("next view"); return;
+    case 'W': net::wifi_diag(); return;
+    case 'R': net::wifi_restore_defaults(); return;
     case 'w': net::scan(); return;
     case 'r': net::probe(); return;
     case 'b': bell::strike(); return;
@@ -302,9 +354,21 @@ void setup() {
 }
 
 void loop() {
+  // Single keystrokes stay as they were; anything ending in a newline is
+  // treated as a line command, so both styles work on the same port.
+  static String line;
   while (Serial.available()) {
     const int c = Serial.read();
-    if (c > ' ') handle_command((char)c);
+    if (c == '\n' || c == '\r') {
+      line.trim();
+      if (line == "get") list_settings();
+      else if (line.length() > 1) handle_line(line);
+      else if (line.length() == 1) handle_command(line[0]);
+      line = "";
+    } else if (c >= ' ') {
+      line += (char)c;
+      if (line.length() > 80) line = "";
+    }
   }
   // Touch is serviced here rather than in the render task: the CST816 shares
   // the I2C bus with the RTC and IMU, and I2C stalls must never land inside the

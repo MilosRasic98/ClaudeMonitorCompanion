@@ -492,6 +492,16 @@ it.
 Three LEDC timers, one each for backlight, striker and piezo. Channels sharing a timer
 corrupt each other's frequency, and the piezo changes frequency mid-sequence.
 
+### The servo is released, not held
+
+A continuous-rotation servo does not move without a signal, so the bell cuts the PWM and
+parks the pin low when idle rather than holding a neutral pulse. Holding neutral keeps the
+servo drawing current, and if its neutral trim is even slightly off it creeps forever — in a
+sealed case, next to the antenna, for no reason.
+
+The servo is also attached on demand rather than at boot, so start-up and joining the network
+happen with it completely inert.
+
 ## Wi-Fi troubleshooting
 
 The board supervises its own reconnection: `setAutoReconnect()` stops trying after enough
