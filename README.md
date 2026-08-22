@@ -17,6 +17,7 @@ feels about them.
 | | |
 |---|---|
 | [`Code/`](Code) | Firmware. PlatformIO + Arduino, ESP32-S3. Start at [Code/README.md](Code/README.md) |
+| [`HOW-IT-WORKS.md`](HOW-IT-WORKS.md) | How the board and Claude Code actually talk, in a page |
 
 CAD, photographs and build notes will land alongside `Code/` as the project comes together.
 
