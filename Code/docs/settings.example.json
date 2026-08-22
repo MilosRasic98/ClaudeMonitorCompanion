@@ -1,0 +1,173 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "curl",
+            "args": ["-s", "-m", "2", "-X", "POST", "-H", "Authorization: Bearer YOUR-TOKEN", "http://BOARD-IP/e/prompt_submitted"],
+            "async": true,
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "curl",
+            "args": ["-s", "-m", "2", "-X", "POST", "-H", "Authorization: Bearer YOUR-TOKEN", "http://BOARD-IP/e/turn_finished"],
+            "async": true,
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "curl",
+            "args": ["-s", "-m", "2", "-X", "POST", "-H", "Authorization: Bearer YOUR-TOKEN", "http://BOARD-IP/e/needs_input"],
+            "async": true,
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "AskUserQuestion|ExitPlanMode",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "curl",
+            "args": ["-s", "-m", "2", "-X", "POST", "-H", "Authorization: Bearer YOUR-TOKEN", "http://BOARD-IP/e/needs_input"],
+            "async": true,
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "AskUserQuestion|ExitPlanMode",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "curl",
+            "args": ["-s", "-m", "2", "-X", "POST", "-H", "Authorization: Bearer YOUR-TOKEN", "http://BOARD-IP/e/answered"],
+            "async": true,
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "idle_prompt",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "curl",
+            "args": ["-s", "-m", "2", "-X", "POST", "-H", "Authorization: Bearer YOUR-TOKEN", "http://BOARD-IP/e/idle"],
+            "async": true,
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "permission_prompt",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "curl",
+            "args": ["-s", "-m", "2", "-X", "POST", "-H", "Authorization: Bearer YOUR-TOKEN", "http://BOARD-IP/e/needs_input"],
+            "async": true,
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "curl",
+            "args": ["-s", "-m", "2", "-X", "POST", "-H", "Authorization: Bearer YOUR-TOKEN", "http://BOARD-IP/e/error"],
+            "async": true,
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "StopFailure": [
+      {
+        "matcher": "rate_limit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "curl",
+            "args": ["-s", "-m", "2", "-X", "POST", "-H", "Authorization: Bearer YOUR-TOKEN", "http://BOARD-IP/e/limit_reached"],
+            "async": true,
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "overloaded|authentication_failed|billing_error|oauth_org_not_allowed|invalid_request|model_not_found|server_error|max_output_tokens|unknown",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "curl",
+            "args": ["-s", "-m", "2", "-X", "POST", "-H", "Authorization: Bearer YOUR-TOKEN", "http://BOARD-IP/e/error"],
+            "async": true,
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "curl",
+            "args": ["-s", "-m", "2", "-X", "POST", "-H", "Authorization: Bearer YOUR-TOKEN", "http://BOARD-IP/e/session_started"],
+            "async": true,
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "curl",
+            "args": ["-s", "-m", "2", "-X", "POST", "-H", "Authorization: Bearer YOUR-TOKEN", "http://BOARD-IP/e/session_ended"],
+            "async": true,
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "python3 '/path/to/ClaudeMonitorCompanion/Code/tools/statusline.py' BOARD-IP YOUR-TOKEN",
+    "refreshInterval": 60
+  }
+}

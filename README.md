@@ -94,7 +94,9 @@ hooks:
 python3 tools/gen_hooks.py <board-ip> <your-token>
 ```
 
-Paste the output into the `hooks` key of `~/.claude/settings.json`. The full walkthrough,
+Merge the output into `~/.claude/settings.json`.
+[`Code/docs/settings.example.json`](Code/docs/settings.example.json) shows what that output
+looks like, with placeholders in place of the address and token. The full walkthrough,
 including why the hook config is shaped the way it is, is in [Code/README.md](Code/README.md).
 
 ## Notes on the build

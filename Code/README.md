@@ -69,6 +69,19 @@ python3 tools/gen_hooks.py 192.168.1.42 your-token
 Paste the output into the `hooks` key of `~/.claude/settings.json`. User scope, not project
 scope — this is a personal desk peripheral, not something to commit into every repo.
 
+[`docs/settings.example.json`](docs/settings.example.json) is exactly what the generator
+prints, with the address and token replaced by `BOARD-IP` and `YOUR-TOKEN`. Read it if you
+want to see the shape before running anything; generate the real one rather than editing it
+by hand, because it repeats the address twelve times. On Windows the `hooks` block is
+byte-identical and only `statusLine.command` differs:
+
+```
+powershell -NoProfile -ExecutionPolicy Bypass -File "C:/path/to/Code/tools/statusline.ps1" BOARD-IP YOUR-TOKEN
+```
+
+Merge it in rather than overwriting the file — `~/.claude/settings.json` also holds your
+theme and notification preferences, and Claude Code will already have written some of it.
+
 Check it works:
 
 ```bash

@@ -29,7 +29,9 @@ That is the entire mechanism. Claude finishes a turn, Claude Code fires that
 `curl`, the board gets a POST, the face grins.
 
 There are twelve of these, one per thing worth knowing about. They differ only
-in the last word of the URL.
+in the last word of the URL. The whole block, as it actually sits in
+`~/.claude/settings.json`, is in
+[`Code/docs/settings.example.json`](Code/docs/settings.example.json).
 
 ## Why there is no JSON, and why that matters
 
