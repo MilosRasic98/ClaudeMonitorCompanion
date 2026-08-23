@@ -114,9 +114,25 @@ firmware can stop after a set number of strikes rather than guessing at a durati
 Both are configurable at runtime; setting either to `-1` disables that half. The bell is
 entirely optional — everything else works without it.
 
-- **[Hardware/Schematics.png](Hardware/Schematics.png)** — full wiring diagram
-- **[Hardware/BOM.md](Hardware/BOM.md)** — bill of materials with order codes
-- **[Code/docs/HARDWARE.md](Code/docs/HARDWARE.md)** — pin map, measured performance, and the traps worth knowing
+Full wiring diagram: **[Hardware/Schematics.png](Hardware/Schematics.png)**. Pin map, measured
+performance figures and the traps worth knowing: **[Code/docs/HARDWARE.md](Code/docs/HARDWARE.md)**.
+
+### Bill of materials
+
+| # | Product name | Manufacturer | Qty | Farnell | Newark |
+|---|---|---|---|---|---|
+| 1 | Continuous servo | Adafruit | 1 | 2816371 | 85W1247 |
+| 2 | Microswitch | Multicomp Pro | 1 | 3553972 | 84AH0093 |
+
+Everything else, no particular source needed:
+
+| # | Name | Description |
+|---|---|---|
+| 1 | Waveshare ESP32-S3 Touchscreen 1.69 | https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-1.69 |
+| 2 | Mechanical bell | |
+| 3 | 3D printing filament | |
+| 4 | M3 and M2 screws | |
+| 5 | Wires and perfboard | |
 
 ## The 3D-printed shell
 
@@ -172,7 +188,7 @@ Windows, where it needs nothing that Windows does not already ship.
 |---|---|
 | [`Code/`](Code) | Firmware. PlatformIO + Arduino, ESP32-S3. Start at [Code/README.md](Code/README.md) |
 | [`CAD/`](CAD) | Printable parts, 3MF and STEP |
-| [`Hardware/`](Hardware) | Schematic and bill of materials |
+| [`Hardware/`](Hardware) | Wiring schematic |
 | [`images/`](images) | Build and result photos |
 | [`HOW-IT-WORKS.md`](HOW-IT-WORKS.md) | How the board and Claude Code actually talk, in a page |
 
